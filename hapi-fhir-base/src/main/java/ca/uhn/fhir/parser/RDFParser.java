@@ -79,7 +79,7 @@ import static ca.uhn.fhir.context.BaseRuntimeElementDefinition.ChildTypeEnum.PRI
  */
 public class RDFParser extends BaseParser {
 
-	private static final String VALUE = "value";
+	private static final String VALUE = "v";
 	private static final String FHIR_INDEX = "index";
 	private static final String FHIR_PREFIX = "fhir";
 	private static final String FHIR_NS = "http://hl7.org/fhir/";
@@ -91,18 +91,19 @@ public class RDFParser extends BaseParser {
 	private static final String XSD_NS = "http://www.w3.org/2001/XMLSchema#";
 	private static final String SCT_PREFIX = "sct";
 	private static final String SCT_NS = "http://snomed.info/id#";
-	private static final String EXTENSION_URL = "Extension.url";
-	private static final String ELEMENT_EXTENSION = "Element.extension";
+	private static final String EXTENSION_URL = "url";
+	private static final String ELEMENT_EXTENSION = "extension";
 
 	private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RDFParser.class);
 
 	public static final String NODE_ROLE = "nodeRole";
-	private static final List<String> ignoredPredicates = Arrays.asList(RDF.type.getURI(), FHIR_NS+FHIR_INDEX, FHIR_NS + NODE_ROLE);
+	private static final List<String> ignoredIriPredicates = Arrays.asList(RDF.type.getURI(), FHIR_NS + NODE_ROLE);
+	private static final List<String> ignoredLiteralPredicates = Arrays.asList(FHIR_NS+FHIR_INDEX);
 	public static final String TREE_ROOT = "treeRoot";
-	public static final String RESOURCE_ID = "Resource.id";
+	public static final String RESOURCE_ID = "id";
 	public static final String ID = "id";
-	public static final String ELEMENT_ID = "Element.id";
-	public static final String DOMAIN_RESOURCE_CONTAINED = "DomainResource.contained";
+	public static final String ELEMENT_ID = "id";
+	public static final String DOMAIN_RESOURCE_CONTAINED = "contained";
 	public static final String EXTENSION = "extension";
 	public static final String CONTAINED = "contained";
 	public static final String MODIFIER_EXTENSION = "modifierExtension";
@@ -272,7 +273,7 @@ public class RDFParser extends BaseParser {
 	 * @return String of predicate name
 	 */
 	private String constructPredicateName(IBaseResource resource, BaseRuntimeChildDefinition definition, String childName, IBase parentElement) {
-		String basePropertyName = FHIR_NS + resource.fhirType() + "." + childName;
+		String basePropertyName = FHIR_NS + childName;
 		String classBasedPropertyName;
 
 		if (definition instanceof BaseRuntimeDeclaredChildDefinition) {
@@ -299,7 +300,7 @@ public class RDFParser extends BaseParser {
 						property = declaredDef.getField().getDeclaringClass().getSimpleName();
 					}
 				}
-				classBasedPropertyName = FHIR_NS + property + "." + childName;
+				classBasedPropertyName = FHIR_NS + childName;
 				return classBasedPropertyName;
 			}
 		}
@@ -597,12 +598,12 @@ public class RDFParser extends BaseParser {
 					continue;
 				}
 
-				Integer cardinalityIndex = null;
+				Integer cardinalityIndex = null; // Resource tail = null
 				int indexCounter = 0;
 
 				for (IBase nextValue : values) {
 					if (nextChild.getMax() != 1) {
-						cardinalityIndex = indexCounter;
+						cardinalityIndex = indexCounter; // tail =
 						indexCounter++;
 					}
 					if ((nextValue == null || nextValue.isEmpty())) {
@@ -642,7 +643,7 @@ public class RDFParser extends BaseParser {
 
 							String propertyName = constructPredicateName(resource, nextChild, childName, nextValue);
 							rdfResource.addProperty(rdfModel.createProperty(propertyName), childResource);
-							if (cardinalityIndex != null && cardinalityIndex > -1) {
+							if (cardinalityIndex != null && cardinalityIndex > -1) { // rest !!
 								childResource.addProperty(rdfModel.createProperty(FHIR_NS + FHIR_INDEX), cardinalityIndex.toString(), XSDDatatype.XSDinteger );
 							}
 							rdfModel = encodeChildElementToStreamWriter(resource, element, rdfModel, childResource, nextChild, nextValue,
@@ -653,7 +654,7 @@ public class RDFParser extends BaseParser {
 								childName, childDef, containedResource, nextChildElem, encodeContext, cardinalityIndex);
 						}
 					}
-				}
+				} // if (tail !== null) { tail.addProperty(rdfModel.createProperty(FHIR_NS + FHIR_INDEX), RDF.nil) }
 			}
 		}
 		return rdfModel;
@@ -721,7 +722,7 @@ public class RDFParser extends BaseParser {
 				}
 			}
 		} else if (rootNode instanceof Literal) {
-			parserState.attributeValue(VALUE, rootNode.asLiteral().getString());
+			parserState.attributeValue("value", rootNode.asLiteral().getString());
 		}
 
 		// Pop top-level entity
@@ -733,14 +734,15 @@ public class RDFParser extends BaseParser {
 
 		// If the predicateURI is one we're ignoring, return null
 		// This minimizes 'Unknown Element' warnings in the parsing process
-		if (ignoredPredicates.contains(predicateUri)) {
+		if (ignoredIriPredicates.contains(predicateUri) && statement.getObject().isResource() ||
+			ignoredLiteralPredicates.contains(predicateUri) && statement.getObject().isLiteral()) {
 			return null;
 		}
 
 		String predicateObjectAttribute = predicateUri.substring(predicateUri.lastIndexOf("/")+1);
 		String predicateAttributeName;
 		if (predicateObjectAttribute.contains(".")) {
-			predicateAttributeName = predicateObjectAttribute.substring(predicateObjectAttribute.lastIndexOf(".")+1);
+			predicateAttributeName = predicateObjectAttribute.substring(predicateObjectAttribute.lastIndexOf(".")+1); // remove branch
 		} else {
 			predicateAttributeName = predicateObjectAttribute;
 		}
@@ -770,7 +772,7 @@ public class RDFParser extends BaseParser {
 				objectStatements.sort(new FhirIndexStatementComparator());
 				for (Statement objectProperty : objectStatements) {
 					if (objectProperty.getPredicate().hasURI(FHIR_NS + VALUE)) {
-						predicateAttributeName = VALUE;
+						predicateAttributeName = "value";
 						parserState.attributeValue(predicateAttributeName, objectProperty.getObject().asLiteral().getLexicalForm());
 					} else {
 						// Otherwise, process it as a net-new node
@@ -818,8 +820,8 @@ public class RDFParser extends BaseParser {
 		RDFNode extensionValueResource = null;
 		for (Statement statement : extensionStatements) {
 			String propertyUri = statement.getPredicate().getURI();
-			if (propertyUri.contains("Extension.value")) {
-				extensionValueType = propertyUri.replace(FHIR_NS + "Extension.", "");
+			if (propertyUri.contains("value")) {
+				extensionValueType = propertyUri.replace(FHIR_NS, "");
 				BaseRuntimeElementDefinition<?> target = getContext().getRuntimeChildUndeclaredExtensionDefinition().getChildByName(extensionValueType);
 				if (target.getChildType().equals(ID_DATATYPE) || target.getChildType().equals(PRIMITIVE_DATATYPE)) {
 					extensionValueResource = statement.getObject().asResource().getProperty(resource.getModel().createProperty(FHIR_NS+VALUE)).getObject().asLiteral();
@@ -865,7 +867,12 @@ public class RDFParser extends BaseParser {
 
 		private int getFhirIndex(Resource resource) {
 			if (resource.hasProperty(resource.getModel().createProperty(FHIR_NS+FHIR_INDEX))) {
-				return resource.getProperty(resource.getModel().createProperty(FHIR_NS+FHIR_INDEX)).getInt();
+				StmtIterator it = resource.listProperties(resource.getModel().createProperty(FHIR_NS+FHIR_INDEX));
+				while (it.hasNext()) {
+					RDFNode o = it.nextStatement().getObject();
+					if (o.isLiteral())
+						return o.asLiteral().getInt();
+				}
 			}
 			return -1;
 		}
