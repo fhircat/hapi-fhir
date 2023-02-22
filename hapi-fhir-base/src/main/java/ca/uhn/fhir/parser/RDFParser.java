@@ -264,10 +264,6 @@ public class RDFParser extends BaseParser {
 	 */
 	private Resource createFhirValueBlankNode(Model rdfModel, String value, XSDDatatype xsdDataType, Integer cardinalityIndex) {
 		Resource fhirValueBlankNodeResource = rdfModel.createResource().addProperty(rdfModel.createProperty(FHIR_NS + VALUE), rdfModel.createTypedLiteral(value, xsdDataType));
-
-		if (cardinalityIndex != null && cardinalityIndex > -1) {
-			fhirValueBlankNodeResource.addProperty(rdfModel.createProperty(FHIR_NS + FHIR_INDEX), rdfModel.createTypedLiteral(cardinalityIndex, XSDDatatype.XSDinteger));if (true) throw new Error("vestigial fhir:index");
-		}
 		return fhirValueBlankNodeResource;
 	}
 
@@ -367,7 +363,6 @@ public class RDFParser extends BaseParser {
 									for (IBaseExtension extension : hasExtension.getExtension()) {
 										RuntimeResourceDefinition resDef = getContext().getResourceDefinition(resource);
 										Resource extensionResource = rdfModel.createResource();
-										extensionResource.addProperty(rdfModel.createProperty(FHIR_NS+FHIR_INDEX), rdfModel.createTypedLiteral(i, XSDDatatype.XSDinteger));if (true) throw new Error("vestigial fhir:index");
 										valueResource.addProperty(rdfModel.createProperty(FHIR_NS + ELEMENT_EXTENSION), extensionResource);
 										encodeCompositeElementToStreamWriter(resource, extension, rdfModel, extensionResource, false, new CompositeChildElement(resDef, encodeContext), encodeContext);
 									}
@@ -878,9 +873,19 @@ public class RDFParser extends BaseParser {
 							String nestedAttributeName = extractAttributeNameFromPredicate(objectProperty);
 							if (nestedAttributeName != null) {
 								if (nestedAttributeName.equals(EXTENSION)) {
-									processExtension(parserState, objectProperty.getObject(), false);
+									List<RDFNode> extensionNodes = objectProperty.getObject().asResource().hasProperty(RDF.first) // TODO: sometimes a list; why?
+										? objectProperty.getObject().as(RDFList.class).iterator().toList()
+										: Collections.singletonList(objectProperty.getObject());
+									for (RDFNode extensionNode : extensionNodes) {
+										processExtension(parserState, extensionNode, false);
+									}
 								} else if (nestedAttributeName.equals(MODIFIER_EXTENSION)) {
-									processExtension(parserState, objectProperty.getObject(), true);
+									List<RDFNode> extensionNodes = objectProperty.getObject().asResource().hasProperty(RDF.first)
+										? objectProperty.getObject().as(RDFList.class).iterator().toList()
+										: Collections.singletonList(objectProperty.getObject());
+									for (RDFNode extensionNode : extensionNodes) {
+										processExtension(parserState, extensionNode, true);
+									}
 								} else {
 									processStatementObject(parserState, nestedAttributeName, objectProperty.getObject());
 								}
