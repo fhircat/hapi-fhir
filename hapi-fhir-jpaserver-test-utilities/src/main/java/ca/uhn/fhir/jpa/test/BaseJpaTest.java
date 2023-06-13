@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.test;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server Test Utilities
@@ -19,6 +17,7 @@ package ca.uhn.fhir.jpa.test;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.test;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.IValidationSupport;
@@ -26,7 +25,9 @@ import ca.uhn.fhir.interceptor.api.IAnonymousInterceptor;
 import ca.uhn.fhir.interceptor.api.IInterceptorService;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.interceptor.executor.InterceptorService;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
+import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
+import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.api.dao.IFhirSystemDao;
 import ca.uhn.fhir.jpa.api.model.ExpungeOptions;
 import ca.uhn.fhir.jpa.api.svc.ISearchCoordinatorSvc;
@@ -35,33 +36,9 @@ import ca.uhn.fhir.jpa.config.JpaConfig;
 import ca.uhn.fhir.jpa.dao.BaseHapiFhirDao;
 import ca.uhn.fhir.jpa.dao.IFulltextSearchSvc;
 import ca.uhn.fhir.jpa.dao.JpaPersistedResourceValidationSupport;
-import ca.uhn.fhir.jpa.dao.data.IForcedIdDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceHistoryTableDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceIndexedComboTokensNonUniqueDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamDateDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamNumberDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamStringDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamTokenDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamUriDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceLinkDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceTableDao;
-import ca.uhn.fhir.jpa.dao.data.IResourceTagDao;
-import ca.uhn.fhir.jpa.dao.data.ITermCodeSystemDao;
-import ca.uhn.fhir.jpa.dao.data.ITermCodeSystemVersionDao;
-import ca.uhn.fhir.jpa.dao.data.ITermConceptDao;
-import ca.uhn.fhir.jpa.dao.data.ITermConceptDesignationDao;
-import ca.uhn.fhir.jpa.dao.data.ITermConceptPropertyDao;
-import ca.uhn.fhir.jpa.dao.data.ITermValueSetConceptDao;
-import ca.uhn.fhir.jpa.dao.data.ITermValueSetDao;
-import ca.uhn.fhir.jpa.entity.TermConcept;
-import ca.uhn.fhir.jpa.entity.TermConceptDesignation;
-import ca.uhn.fhir.jpa.entity.TermConceptProperty;
-import ca.uhn.fhir.jpa.entity.TermValueSet;
-import ca.uhn.fhir.jpa.entity.TermValueSetConcept;
-import ca.uhn.fhir.jpa.entity.TermValueSetConceptDesignation;
-import ca.uhn.fhir.jpa.model.entity.ForcedId;
-import ca.uhn.fhir.jpa.model.entity.ResourceHistoryTable;
-import ca.uhn.fhir.jpa.model.entity.ResourceTable;
+import ca.uhn.fhir.jpa.dao.data.*;
+import ca.uhn.fhir.jpa.entity.*;
+import ca.uhn.fhir.jpa.model.entity.*;
 import ca.uhn.fhir.jpa.model.util.JpaConstants;
 import ca.uhn.fhir.jpa.partition.IPartitionLookupSvc;
 import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
@@ -73,7 +50,9 @@ import ca.uhn.fhir.jpa.subscription.match.registry.SubscriptionRegistry;
 import ca.uhn.fhir.jpa.util.CircularQueueCaptureQueriesListener;
 import ca.uhn.fhir.jpa.util.MemoryCacheService;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
+import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
+import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceVersionConflictException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import ca.uhn.fhir.rest.server.util.ISearchParamRegistry;
@@ -83,11 +62,7 @@ import ca.uhn.fhir.test.utilities.LoggingExtension;
 import ca.uhn.fhir.test.utilities.ProxyUtil;
 import ca.uhn.fhir.test.utilities.UnregisterScheduledProcessor;
 import ca.uhn.fhir.test.utilities.server.SpringContextGrabbingTestExecutionListener;
-import ca.uhn.fhir.util.BundleUtil;
-import ca.uhn.fhir.util.ClasspathUtil;
-import ca.uhn.fhir.util.FhirVersionIndependentConcept;
-import ca.uhn.fhir.util.StopWatch;
-import ca.uhn.fhir.util.TestUtil;
+import ca.uhn.fhir.util.*;
 import org.hibernate.HibernateException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -121,13 +96,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.annotation.Nonnull;
 import javax.persistence.EntityManager;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -137,9 +108,7 @@ import java.util.stream.Stream;
 import static ca.uhn.fhir.util.TestUtil.doRandomizeLocaleAndTimezone;
 import static java.util.stream.Collectors.joining;
 import static org.awaitility.Awaitility.await;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -177,7 +146,7 @@ public abstract class BaseJpaTest extends BaseTest {
 	@Autowired
 	protected FhirContext myFhirContext;
 	@Autowired
-	protected DaoConfig myDaoConfig = new DaoConfig();
+	protected JpaStorageSettings myStorageSettings = new JpaStorageSettings();
 	@Autowired
 	protected DatabaseBackedPagingProvider myDatabaseBackedPagingProvider;
 	@Autowired
@@ -211,6 +180,8 @@ public abstract class BaseJpaTest extends BaseTest {
 	@Autowired
 	protected IResourceIndexedSearchParamDateDao myResourceIndexedSearchParamDateDao;
 	@Autowired
+	protected IResourceIndexedSearchParamCoordsDao myResourceIndexedSearchParamCoordsDao;
+	@Autowired
 	protected IResourceIndexedComboTokensNonUniqueDao myResourceIndexedComboTokensNonUniqueDao;
 	@Autowired(required = false)
 	protected IFulltextSearchSvc myFulltestSearchSvc;
@@ -241,7 +212,103 @@ public abstract class BaseJpaTest extends BaseTest {
 	private IResourceHistoryTableDao myResourceHistoryTableDao;
 	@Autowired
 	private IForcedIdDao myForcedIdDao;
+	@Autowired
+	private DaoRegistry myDaoRegistry;
 	private List<Object> myRegisteredInterceptors = new ArrayList<>(1);
+
+	@SuppressWarnings("BusyWait")
+	public static void waitForSize(int theTarget, List<?> theList) {
+		StopWatch sw = new StopWatch();
+		while (theList.size() != theTarget && sw.getMillis() <= 16000) {
+			try {
+				Thread.sleep(50);
+			} catch (InterruptedException theE) {
+				throw new Error(theE);
+			}
+		}
+		if (sw.getMillis() >= 16000 || theList.size() > theTarget) {
+			String describeResults = theList
+				.stream()
+				.map(t -> {
+					if (t == null) {
+						return "null";
+					}
+					if (t instanceof IBaseResource) {
+						return ((IBaseResource) t).getIdElement().getValue();
+					}
+					return t.toString();
+				})
+				.collect(Collectors.joining(", "));
+			fail("Size " + theList.size() + " is != target " + theTarget + " - Got: " + describeResults);
+		}
+	}
+
+	@BeforeAll
+	public static void beforeClassRandomizeLocale() {
+		doRandomizeLocaleAndTimezone();
+	}
+
+	@SuppressWarnings("BusyWait")
+	protected static void purgeDatabase(JpaStorageSettings theStorageSettings, IFhirSystemDao<?, ?> theSystemDao, IResourceReindexingSvc theResourceReindexingSvc, ISearchCoordinatorSvc theSearchCoordinatorSvc, ISearchParamRegistry theSearchParamRegistry, IBulkDataExportJobSchedulingHelper theBulkDataJobActivator) {
+		theSearchCoordinatorSvc.cancelAllActiveSearches();
+		theResourceReindexingSvc.cancelAndPurgeAllJobs();
+		theBulkDataJobActivator.cancelAndPurgeAllJobs();
+
+		boolean expungeEnabled = theStorageSettings.isExpungeEnabled();
+		boolean multiDeleteEnabled = theStorageSettings.isAllowMultipleDelete();
+		theStorageSettings.setExpungeEnabled(true);
+		theStorageSettings.setAllowMultipleDelete(true);
+
+		for (int count = 0; ; count++) {
+			try {
+				theSystemDao.expunge(new ExpungeOptions().setExpungeEverything(true), new SystemRequestDetails());
+				break;
+			} catch (Exception e) {
+				if (count >= 3) {
+					ourLog.error("Failed during expunge", e);
+					fail(e.toString());
+				} else {
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e2) {
+						fail(e2.toString());
+					}
+				}
+			}
+		}
+		theStorageSettings.setExpungeEnabled(expungeEnabled);
+		theStorageSettings.setAllowMultipleDelete(multiDeleteEnabled);
+
+		theSearchParamRegistry.forceRefresh();
+	}
+
+	protected static Set<String> toCodes(Set<TermConcept> theConcepts) {
+		HashSet<String> retVal = new HashSet<>();
+		for (TermConcept next : theConcepts) {
+			retVal.add(next.getCode());
+		}
+		return retVal;
+	}
+
+	protected static Set<String> toCodes(List<FhirVersionIndependentConcept> theConcepts) {
+		HashSet<String> retVal = new HashSet<>();
+		for (FhirVersionIndependentConcept next : theConcepts) {
+			retVal.add(next.getCode());
+		}
+		return retVal;
+	}
+
+	public static void waitForSize(int theTarget, Callable<Number> theCallable, Callable<String> theFailureMessage) throws Exception {
+		waitForSize(theTarget, 10000, theCallable, theFailureMessage);
+	}
+
+	@SuppressWarnings("BusyWait")
+	public static void waitForSize(int theTarget, int theTimeoutMillis, Callable<Number> theCallable, Callable<String> theFailureMessage) throws Exception {
+		await()
+			.alias("Waiting for size " + theTarget + ". Current size is " + theCallable.call().intValue() + ": " + theFailureMessage.call())
+			.atMost(Duration.of(theTimeoutMillis, ChronoUnit.MILLIS))
+			.until(() -> theCallable.call().intValue() == theTarget);
+	}
 
 	protected <T extends IBaseResource> T loadResourceFromClasspath(Class<T> type, String resourceName) throws IOException {
 		return ClasspathUtil.loadResource(myFhirContext, type, resourceName);
@@ -265,9 +332,9 @@ public abstract class BaseJpaTest extends BaseTest {
 		if (myFhirInstanceValidator != null) {
 			myFhirInstanceValidator.invalidateCaches();
 		}
-		DaoConfig defaultConfig = new DaoConfig();
-		myDaoConfig.setAdvancedHSearchIndexing(defaultConfig.isAdvancedHSearchIndexing());
-		myDaoConfig.setAllowContainsSearches(defaultConfig.isAllowContainsSearches());
+		JpaStorageSettings defaultConfig = new JpaStorageSettings();
+		myStorageSettings.setAdvancedHSearchIndexing(defaultConfig.isAdvancedHSearchIndexing());
+		myStorageSettings.setAllowContainsSearches(defaultConfig.isAllowContainsSearches());
 	}
 
 	@AfterEach
@@ -348,17 +415,16 @@ public abstract class BaseJpaTest extends BaseTest {
 		});
 	}
 
-
 	protected void logAllResourceLinks() {
 		runInTransaction(() -> {
-			ourLog.info("Resource Links:\n * {}", myResourceLinkDao.findAll().stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Resource Links:\n * {}", myResourceLinkDao.findAll().stream().map(ResourceLink::toString).collect(Collectors.joining("\n * ")));
 		});
 	}
 
 	protected int logAllResources() {
 		return runInTransaction(() -> {
 			List<ResourceTable> resources = myResourceTableDao.findAll();
-			ourLog.info("Resources:\n * {}", resources.stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Resources:\n * {}", resources.stream().map(ResourceTable::toString).collect(Collectors.joining("\n * ")));
 			return resources.size();
 		});
 	}
@@ -366,7 +432,7 @@ public abstract class BaseJpaTest extends BaseTest {
 	protected int logAllConceptDesignations() {
 		return runInTransaction(() -> {
 			List<TermConceptDesignation> resources = myTermConceptDesignationDao.findAll();
-			ourLog.info("Concept Designations:\n * {}", resources.stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Concept Designations:\n * {}", resources.stream().map(TermConceptDesignation::toString).collect(Collectors.joining("\n * ")));
 			return resources.size();
 		});
 	}
@@ -374,7 +440,7 @@ public abstract class BaseJpaTest extends BaseTest {
 	protected int logAllConceptProperties() {
 		return runInTransaction(() -> {
 			List<TermConceptProperty> resources = myTermConceptPropertyDao.findAll();
-			ourLog.info("Concept Designations:\n * {}", resources.stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Concept Designations:\n * {}", resources.stream().map(TermConceptProperty::toString).collect(Collectors.joining("\n * ")));
 			return resources.size();
 		});
 	}
@@ -382,7 +448,7 @@ public abstract class BaseJpaTest extends BaseTest {
 	protected int logAllConcepts() {
 		return runInTransaction(() -> {
 			List<TermConcept> resources = myTermConceptDao.findAll();
-			ourLog.info("Concepts:\n * {}", resources.stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Concepts:\n * {}", resources.stream().map(TermConcept::toString).collect(Collectors.joining("\n * ")));
 			return resources.size();
 		});
 	}
@@ -390,7 +456,7 @@ public abstract class BaseJpaTest extends BaseTest {
 	protected int logAllValueSetConcepts() {
 		return runInTransaction(() -> {
 			List<TermValueSetConcept> resources = myTermValueSetConceptDao.findAll();
-			ourLog.info("Concepts:\n * {}", resources.stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Concepts:\n * {}", resources.stream().map(TermValueSetConcept::toString).collect(Collectors.joining("\n * ")));
 			return resources.size();
 		});
 	}
@@ -398,7 +464,7 @@ public abstract class BaseJpaTest extends BaseTest {
 	protected int logAllValueSets() {
 		return runInTransaction(() -> {
 			List<TermValueSet> valueSets = myTermValueSetDao.findAll();
-			ourLog.info("ValueSets:\n * {}", valueSets.stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("ValueSets:\n * {}", valueSets.stream().map(TermValueSet::toString).collect(Collectors.joining("\n * ")));
 			return valueSets.size();
 		});
 	}
@@ -406,38 +472,44 @@ public abstract class BaseJpaTest extends BaseTest {
 	protected int logAllForcedIds() {
 		return runInTransaction(() -> {
 			List<ForcedId> forcedIds = myForcedIdDao.findAll();
-			ourLog.info("Resources:\n * {}", forcedIds.stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Resources:\n * {}", forcedIds.stream().map(ForcedId::toString).collect(Collectors.joining("\n * ")));
 			return forcedIds.size();
 		});
 	}
 
 	protected void logAllDateIndexes() {
 		runInTransaction(() -> {
-			ourLog.info("Date indexes:\n * {}", myResourceIndexedSearchParamDateDao.findAll().stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Date indexes:\n * {}", myResourceIndexedSearchParamDateDao.findAll().stream().map(ResourceIndexedSearchParamDate::toString).collect(Collectors.joining("\n * ")));
 		});
 	}
 
 	protected void logAllNonUniqueIndexes() {
 		runInTransaction(() -> {
-			ourLog.info("Non unique indexes:\n * {}", myResourceIndexedComboTokensNonUniqueDao.findAll().stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Non unique indexes:\n * {}", myResourceIndexedComboTokensNonUniqueDao.findAll().stream().map(ResourceIndexedComboTokenNonUnique::toString).collect(Collectors.joining("\n * ")));
 		});
 	}
 
 	protected void logAllTokenIndexes() {
 		runInTransaction(() -> {
-			ourLog.info("Token indexes:\n * {}", myResourceIndexedSearchParamTokenDao.findAll().stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Token indexes:\n * {}", myResourceIndexedSearchParamTokenDao.findAll().stream().map(ResourceIndexedSearchParamToken::toString).collect(Collectors.joining("\n * ")));
+		});
+	}
+
+	protected void logAllCoordsIndexes() {
+		runInTransaction(() -> {
+			ourLog.info("Coords indexes:\n * {}", myResourceIndexedSearchParamCoordsDao.findAll().stream().map(ResourceIndexedSearchParamCoords::toString).collect(Collectors.joining("\n * ")));
 		});
 	}
 
 	protected void logAllNumberIndexes() {
 		runInTransaction(() -> {
-			ourLog.info("Number indexes:\n * {}", myResourceIndexedSearchParamNumberDao.findAll().stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("Number indexes:\n * {}", myResourceIndexedSearchParamNumberDao.findAll().stream().map(ResourceIndexedSearchParamNumber::toString).collect(Collectors.joining("\n * ")));
 		});
 	}
 
 	protected void logAllUriIndexes() {
 		runInTransaction(() -> {
-			ourLog.info("URI indexes:\n * {}", myResourceIndexedSearchParamUriDao.findAll().stream().map(t -> t.toString()).collect(Collectors.joining("\n * ")));
+			ourLog.info("URI indexes:\n * {}", myResourceIndexedSearchParamUriDao.findAll().stream().map(ResourceIndexedSearchParamUri::toString).collect(Collectors.joining("\n * ")));
 		});
 	}
 
@@ -733,105 +805,35 @@ public abstract class BaseJpaTest extends BaseTest {
 		myRegisteredInterceptors.clear();
 	}
 
-	@SuppressWarnings("BusyWait")
-	public static void waitForSize(int theTarget, List<?> theList) {
-		StopWatch sw = new StopWatch();
-		while (theList.size() != theTarget && sw.getMillis() <= 16000) {
-			try {
-				Thread.sleep(50);
-			} catch (InterruptedException theE) {
-				throw new Error(theE);
-			}
-		}
-		if (sw.getMillis() >= 16000 || theList.size() > theTarget) {
-			String describeResults = theList
-				.stream()
-				.map(t -> {
-					if (t == null) {
-						return "null";
-					}
-					if (t instanceof IBaseResource) {
-						return ((IBaseResource) t).getIdElement().getValue();
-					}
-					return t.toString();
-				})
-				.collect(Collectors.joining(", "));
-			fail("Size " + theList.size() + " is != target " + theTarget + " - Got: " + describeResults);
-		}
+	/**
+	 * Asserts that the resource with {@literal theId} is deleted
+	 */
+	protected void assertGone(IIdType theId) {
+		IFhirResourceDao dao = myDaoRegistry.getResourceDao(theId.getResourceType());
+		IBaseResource result = dao.read(theId, mySrd, true);
+		assertTrue(result.isDeleted());
 	}
 
-	@BeforeAll
-	public static void beforeClassRandomizeLocale() {
-		doRandomizeLocaleAndTimezone();
+	/**
+	 * Asserts that the resource with {@literal theId} exists and is not deleted
+	 */
+	protected void assertNotGone(IIdType theId) {
+		IFhirResourceDao dao = myDaoRegistry.getResourceDao(theId.getResourceType());
+		assertNotNull(dao.read(theId, mySrd));
 	}
 
-	@SuppressWarnings("BusyWait")
-	protected static void purgeDatabase(DaoConfig theDaoConfig, IFhirSystemDao<?, ?> theSystemDao, IResourceReindexingSvc theResourceReindexingSvc, ISearchCoordinatorSvc theSearchCoordinatorSvc, ISearchParamRegistry theSearchParamRegistry, IBulkDataExportJobSchedulingHelper theBulkDataJobActivator) {
-		theSearchCoordinatorSvc.cancelAllActiveSearches();
-		theResourceReindexingSvc.cancelAndPurgeAllJobs();
-		theBulkDataJobActivator.cancelAndPurgeAllJobs();
-
-		boolean expungeEnabled = theDaoConfig.isExpungeEnabled();
-		boolean multiDeleteEnabled = theDaoConfig.isAllowMultipleDelete();
-		theDaoConfig.setExpungeEnabled(true);
-		theDaoConfig.setAllowMultipleDelete(true);
-
-		for (int count = 0; ; count++) {
-			try {
-				theSystemDao.expunge(new ExpungeOptions().setExpungeEverything(true), null);
-				break;
-			} catch (Exception e) {
-				if (count >= 3) {
-					ourLog.error("Failed during expunge", e);
-					fail(e.toString());
-				} else {
-					try {
-						Thread.sleep(1000);
-					} catch (InterruptedException e2) {
-						fail(e2.toString());
-					}
-				}
-			}
+	/**
+	 * Asserts that the resource with {@literal theId} does not exist (i.e. not that
+	 * it exists but that it was deleted, but rather that the ID doesn't exist at all).
+	 * This can be used to test that a resource was expunged.
+	 */
+	protected void assertDoesntExist(IIdType theId) {
+		IFhirResourceDao dao = myDaoRegistry.getResourceDao(theId.getResourceType());
+		try {
+			dao.read(theId, mySrd);
+			fail();
+		} catch (ResourceNotFoundException e) {
+			// good
 		}
-		theDaoConfig.setExpungeEnabled(expungeEnabled);
-		theDaoConfig.setAllowMultipleDelete(multiDeleteEnabled);
-
-		theSearchParamRegistry.forceRefresh();
-	}
-
-	protected static Set<String> toCodes(Set<TermConcept> theConcepts) {
-		HashSet<String> retVal = new HashSet<>();
-		for (TermConcept next : theConcepts) {
-			retVal.add(next.getCode());
-		}
-		return retVal;
-	}
-
-	protected static Set<String> toCodes(List<FhirVersionIndependentConcept> theConcepts) {
-		HashSet<String> retVal = new HashSet<>();
-		for (FhirVersionIndependentConcept next : theConcepts) {
-			retVal.add(next.getCode());
-		}
-		return retVal;
-	}
-
-	public static void waitForSize(int theTarget, Callable<Number> theCallable, Callable<String> theFailureMessage) throws Exception {
-		waitForSize(theTarget, 10000, theCallable, theFailureMessage);
-	}
-
-	@SuppressWarnings("BusyWait")
-	public static void waitForSize(int theTarget, int theTimeout, Callable<Number> theCallable, Callable<String> theFailureMessage) throws Exception {
-		StopWatch sw = new StopWatch();
-		while (theCallable.call().intValue() != theTarget && sw.getMillis() < theTimeout) {
-			try {
-				Thread.sleep(50);
-			} catch (InterruptedException theE) {
-				throw new Error(theE);
-			}
-		}
-		if (sw.getMillis() >= theTimeout) {
-			fail("Size " + theCallable.call() + " is != target " + theTarget + " - " + theFailureMessage.call());
-		}
-		Thread.sleep(500);
 	}
 }

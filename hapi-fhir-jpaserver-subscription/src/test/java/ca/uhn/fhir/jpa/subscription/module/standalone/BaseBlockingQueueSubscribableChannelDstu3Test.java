@@ -5,13 +5,12 @@ import ca.uhn.fhir.interceptor.api.HookParams;
 import ca.uhn.fhir.interceptor.api.IInterceptorService;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.interceptor.model.RequestPartitionId;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.model.config.PartitionSettings;
+import ca.uhn.fhir.jpa.model.entity.StorageSettings;
 import ca.uhn.fhir.jpa.subscription.channel.api.ChannelConsumerSettings;
 import ca.uhn.fhir.jpa.subscription.channel.subscription.ISubscriptionDeliveryChannelNamer;
 import ca.uhn.fhir.jpa.subscription.channel.subscription.SubscriptionChannelFactory;
-import ca.uhn.fhir.jpa.subscription.match.registry.SubscriptionLoader;
 import ca.uhn.fhir.jpa.subscription.match.registry.SubscriptionRegistry;
 import ca.uhn.fhir.jpa.subscription.model.CanonicalSubscription;
 import ca.uhn.fhir.jpa.subscription.model.CanonicalSubscriptionChannelType;
@@ -57,17 +56,35 @@ import java.util.Collections;
 import java.util.List;
 
 public abstract class BaseBlockingQueueSubscribableChannelDstu3Test extends BaseSubscriptionDstu3Test {
-	private static final Logger ourLog = LoggerFactory.getLogger(SubscriptionMatchingSubscriberTest.class);
 	public static final ChannelConsumerSettings CONSUMER_OPTIONS = new ChannelConsumerSettings().setConcurrentConsumers(1);
-	protected static ObservationListener ourObservationListener;
-
-	@Autowired
-	FhirContext myFhirContext;
-	@Autowired
-	protected DaoRegistry myDaoRegistry;
+	protected static final List<Observation> ourCreatedObservations = Collections.synchronizedList(Lists.newArrayList());
+	protected static final List<Observation> ourUpdatedObservations = Collections.synchronizedList(Lists.newArrayList());
+	protected static final List<String> ourContentTypes = Collections.synchronizedList(new ArrayList<>());
+	private static final Logger ourLog = LoggerFactory.getLogger(SubscriptionMatchingSubscriberTest.class);
 
 	// Caused by: java.lang.IllegalStateException: Unable to register mock bean org.springframework.messaging.MessageHandler expected a single matching bean to replace but found [subscriptionActivatingSubscriber, subscriptionDeliveringEmailSubscriber, subscriptionDeliveringRestHookSubscriber, subscriptionMatchingSubscriber, subscriptionRegisteringSubscriber]
-
+	protected static ObservationListener ourObservationListener;
+	protected static String ourListenerServerBase;
+	private static int ourListenerPort;
+	private static RestfulServer ourListenerRestServer;
+	private static Server ourListenerServer;
+	private static SubscribableChannel ourSubscribableChannel;
+	protected final PointcutLatch mySubscriptionMatchingPost = new PointcutLatch(Pointcut.SUBSCRIPTION_AFTER_PERSISTED_RESOURCE_CHECKED);
+	protected final PointcutLatch mySubscriptionActivatedPost = new PointcutLatch(Pointcut.SUBSCRIPTION_AFTER_ACTIVE_SUBSCRIPTION_REGISTERED);
+	protected final PointcutLatch mySubscriptionAfterDelivery = new PointcutLatch(Pointcut.SUBSCRIPTION_AFTER_DELIVERY);
+	protected final PointcutLatch mySubscriptionResourceMatched = new PointcutLatch(Pointcut.SUBSCRIPTION_RESOURCE_MATCHED);
+	protected final PointcutLatch mySubscriptionResourceNotMatched = new PointcutLatch(Pointcut.SUBSCRIPTION_RESOURCE_DID_NOT_MATCH_ANY_SUBSCRIPTIONS);
+	@Autowired
+	protected DaoRegistry myDaoRegistry;
+	@Autowired
+	protected SubscriptionRegistry mySubscriptionRegistry;
+	@Autowired
+	protected PartitionSettings myPartitionSettings;
+	@Autowired
+	protected StorageSettings myStorageSettings;
+	protected String myCode = "1000000050";
+	@Autowired
+	FhirContext myFhirContext;
 	@Autowired
 	@Qualifier("subscriptionActivatingSubscriber")
 	MessageHandler mySubscriptionActivatingSubscriber;
@@ -77,37 +94,12 @@ public abstract class BaseBlockingQueueSubscribableChannelDstu3Test extends Base
 	@Autowired
 	@Qualifier("subscriptionMatchingSubscriber")
 	MessageHandler subscriptionMatchingSubscriber;
-
 	@Autowired
 	SubscriptionChannelFactory mySubscriptionChannelFactory;
 	@Autowired
 	IInterceptorService myInterceptorRegistry;
 	@Autowired
-	protected SubscriptionRegistry mySubscriptionRegistry;
-	@Autowired
-	private SubscriptionLoader mySubscriptionLoader;
-	@Autowired
 	private ISubscriptionDeliveryChannelNamer mySubscriptionDeliveryChannelNamer;
-	@Autowired
-	protected PartitionSettings myPartitionSettings;
-	@Autowired
-	protected DaoConfig myDaoConfig;
-
-	protected String myCode = "1000000050";
-
-	private static int ourListenerPort;
-	private static RestfulServer ourListenerRestServer;
-	private static Server ourListenerServer;
-	protected static String ourListenerServerBase;
-	protected static final List<Observation> ourCreatedObservations = Collections.synchronizedList(Lists.newArrayList());
-	protected static final List<Observation> ourUpdatedObservations = Collections.synchronizedList(Lists.newArrayList());
-	protected static final List<String> ourContentTypes = Collections.synchronizedList(new ArrayList<>());
-	private static SubscribableChannel ourSubscribableChannel;
-	protected final PointcutLatch mySubscriptionMatchingPost = new PointcutLatch(Pointcut.SUBSCRIPTION_AFTER_PERSISTED_RESOURCE_CHECKED);
-	protected final PointcutLatch mySubscriptionActivatedPost = new PointcutLatch(Pointcut.SUBSCRIPTION_AFTER_ACTIVE_SUBSCRIPTION_REGISTERED);
-	protected final PointcutLatch mySubscriptionAfterDelivery = new PointcutLatch(Pointcut.SUBSCRIPTION_AFTER_DELIVERY);
-	protected final PointcutLatch mySubscriptionResourceMatched = new PointcutLatch(Pointcut.SUBSCRIPTION_RESOURCE_MATCHED);
-	protected final PointcutLatch mySubscriptionResourceNotMatched = new PointcutLatch(Pointcut.SUBSCRIPTION_RESOURCE_DID_NOT_MATCH_ANY_SUBSCRIPTIONS);
 
 	@BeforeEach
 	public void beforeReset() {
@@ -136,6 +128,8 @@ public abstract class BaseBlockingQueueSubscribableChannelDstu3Test extends Base
 		mySubscriptionMatchingPost.clear();
 		mySubscriptionActivatedPost.clear();
 		ourObservationListener.clear();
+		mySubscriptionResourceMatched.clear();
+		mySubscriptionResourceNotMatched.clear();
 		super.clearRegistry();
 	}
 
@@ -153,9 +147,11 @@ public abstract class BaseBlockingQueueSubscribableChannelDstu3Test extends Base
 	}
 
 	protected Subscription sendSubscription(Subscription theSubscription, RequestPartitionId theRequestPartitionId, Boolean mockDao) throws InterruptedException {
+		mySubscriptionResourceNotMatched.setExpectedCount(1);
 		mySubscriptionActivatedPost.setExpectedCount(1);
 		Subscription retVal = sendResource(theSubscription, theRequestPartitionId);
 		mySubscriptionActivatedPost.awaitExpected();
+		mySubscriptionResourceNotMatched.awaitExpected();
 		return retVal;
 	}
 
@@ -177,36 +173,6 @@ public abstract class BaseBlockingQueueSubscribableChannelDstu3Test extends Base
 		observation.setStatus(Observation.ObservationStatus.FINAL);
 
 		return sendResource(observation, theRequestPartitionId);
-	}
-
-	@BeforeAll
-	public static void startListenerServer() throws Exception {
-		ourListenerRestServer = new RestfulServer(FhirContext.forDstu3());
-
-		ourObservationListener = new ObservationListener();
-		ourListenerRestServer.setResourceProviders(ourObservationListener);
-
-		ourListenerServer = new Server(0);
-
-		ServletContextHandler proxyHandler = new ServletContextHandler();
-		proxyHandler.setContextPath("/");
-
-		ServletHolder servletHolder = new ServletHolder();
-		servletHolder.setServlet(ourListenerRestServer);
-		proxyHandler.addServlet(servletHolder, "/fhir/context/*");
-
-		ourListenerServer.setHandler(proxyHandler);
-		JettyUtil.startServer(ourListenerServer);
-		ourListenerPort = JettyUtil.getPortForStartedServer(ourListenerServer);
-		ourListenerServerBase = "http://localhost:" + ourListenerPort + "/fhir/context";
-		FhirContext context = ourListenerRestServer.getFhirContext();
-		//Preload structure definitions so the load doesn't happen during the test (first load can be a little slow)
-		context.getValidationSupport().fetchAllStructureDefinitions();
-	}
-
-	@AfterAll
-	public static void stopListenerServer() throws Exception {
-		JettyUtil.closeServer(ourListenerServer);
 	}
 
 	public static class ObservationListener implements IResourceProvider, IPointcutLatch {
@@ -249,5 +215,35 @@ public abstract class BaseBlockingQueueSubscribableChannelDstu3Test extends Base
 		public void clear() {
 			updateLatch.clear();
 		}
+	}
+
+	@BeforeAll
+	public static void startListenerServer() throws Exception {
+		ourListenerRestServer = new RestfulServer(FhirContext.forDstu3());
+
+		ourObservationListener = new ObservationListener();
+		ourListenerRestServer.setResourceProviders(ourObservationListener);
+
+		ourListenerServer = new Server(0);
+
+		ServletContextHandler proxyHandler = new ServletContextHandler();
+		proxyHandler.setContextPath("/");
+
+		ServletHolder servletHolder = new ServletHolder();
+		servletHolder.setServlet(ourListenerRestServer);
+		proxyHandler.addServlet(servletHolder, "/fhir/context/*");
+
+		ourListenerServer.setHandler(proxyHandler);
+		JettyUtil.startServer(ourListenerServer);
+		ourListenerPort = JettyUtil.getPortForStartedServer(ourListenerServer);
+		ourListenerServerBase = "http://localhost:" + ourListenerPort + "/fhir/context";
+		FhirContext context = ourListenerRestServer.getFhirContext();
+		//Preload structure definitions so the load doesn't happen during the test (first load can be a little slow)
+		context.getValidationSupport().fetchAllStructureDefinitions();
+	}
+
+	@AfterAll
+	public static void stopListenerServer() throws Exception {
+		JettyUtil.closeServer(ourListenerServer);
 	}
 }

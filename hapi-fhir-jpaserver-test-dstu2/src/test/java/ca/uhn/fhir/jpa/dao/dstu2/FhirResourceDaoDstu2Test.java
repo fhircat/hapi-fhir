@@ -1,7 +1,7 @@
 package ca.uhn.fhir.jpa.dao.dstu2;
 
 import ca.uhn.fhir.i18n.Msg;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.model.HistoryCountModeEnum;
 import ca.uhn.fhir.jpa.dao.BaseHapiFhirDao;
 import ca.uhn.fhir.jpa.dao.BaseStorageDao;
@@ -32,6 +32,7 @@ import ca.uhn.fhir.model.dstu2.resource.Device;
 import ca.uhn.fhir.model.dstu2.resource.DiagnosticReport;
 import ca.uhn.fhir.model.dstu2.resource.Encounter;
 import ca.uhn.fhir.model.dstu2.resource.Observation;
+import ca.uhn.fhir.model.dstu2.resource.OperationOutcome;
 import ca.uhn.fhir.model.dstu2.resource.Organization;
 import ca.uhn.fhir.model.dstu2.resource.Patient;
 import ca.uhn.fhir.model.dstu2.resource.Questionnaire;
@@ -67,7 +68,6 @@ import ca.uhn.fhir.rest.param.StringParam;
 import ca.uhn.fhir.rest.param.TokenOrListParam;
 import ca.uhn.fhir.rest.param.TokenParam;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
-import ca.uhn.fhir.rest.server.exceptions.PreconditionFailedException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceVersionConflictException;
@@ -104,7 +104,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -117,37 +116,15 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 
 	@AfterEach
 	public final void after() {
-		myDaoConfig.setAllowExternalReferences(new DaoConfig().isAllowExternalReferences());
-		myDaoConfig.setTreatReferencesAsLogical(new DaoConfig().getTreatReferencesAsLogical());
-		myDaoConfig.setEnforceReferentialIntegrityOnDelete(new DaoConfig().isEnforceReferentialIntegrityOnDelete());
-		myDaoConfig.setHistoryCountMode(DaoConfig.DEFAULT_HISTORY_COUNT_MODE);
-	}
-
-	private void assertGone(IIdType theId) {
-		try {
-			assertNotGone(theId);
-			fail();
-		} catch (ResourceGoneException e) {
-			// good
-		}
-	}
-
-	/**
-	 * This gets called from assertGone too! Careful about exceptions...
-	 */
-	private void assertNotGone(IIdType theId) {
-		if ("Patient".equals(theId.getResourceType())) {
-			myPatientDao.read(theId, mySrd);
-		} else if ("Organization".equals(theId.getResourceType())) {
-			myOrganizationDao.read(theId, mySrd);
-		} else {
-			fail("No type");
-		}
+		myStorageSettings.setAllowExternalReferences(new JpaStorageSettings().isAllowExternalReferences());
+		myStorageSettings.setTreatReferencesAsLogical(new JpaStorageSettings().getTreatReferencesAsLogical());
+		myStorageSettings.setEnforceReferentialIntegrityOnDelete(new JpaStorageSettings().isEnforceReferentialIntegrityOnDelete());
+		myStorageSettings.setHistoryCountMode(JpaStorageSettings.DEFAULT_HISTORY_COUNT_MODE);
 	}
 
 	@BeforeEach
 	public void beforeDisableResultReuse() {
-		myDaoConfig.setReuseCachedSearchResultsForMillis(null);
+		myStorageSettings.setReuseCachedSearchResultsForMillis(null);
 	}
 
 	private List<String> extractNames(IBundleProvider theSearch) {
@@ -210,7 +187,7 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 	 */
 	@Test
 	public void testBuiltInLogicalReferences() throws IOException {
-		myDaoConfig.getTreatReferencesAsLogical().add("http://phr.kanta.fi/fiphr-vs-*");
+		myStorageSettings.getTreatReferencesAsLogical().add("http://phr.kanta.fi/fiphr-vs-*");
 
 		ValueSet vsBodySite = loadResourceFromClasspath(ValueSet.class, "/issue534/fiphr-vs-bodysite.xml");
 		myValueSetDao.create(vsBodySite, mySrd);
@@ -646,7 +623,7 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 
 	@Test
 	public void testDeleteResource() {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		int initialHistory = myPatientDao.history(null, null, null, mySrd).size();
 
@@ -693,7 +670,7 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 		IBundleProvider history = myPatientDao.history(null, null, null, mySrd);
 		assertEquals(4 + initialHistory, history.sizeOrThrowNpe());
 		List<IBaseResource> resources = history.getResources(0, 4);
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get((IResource) resources.get(0)));
+		assertTrue(resources.get(0).isDeleted());
 
 		try {
 			myPatientDao.delete(id2, mySrd);
@@ -714,7 +691,7 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 	 */
 	@Test
 	public void testDeleteResourceWithOutboundDeletedResources() {
-		myDaoConfig.setEnforceReferentialIntegrityOnDelete(false);
+		myStorageSettings.setEnforceReferentialIntegrityOnDelete(false);
 
 		Organization org = new Organization();
 		org.setId("ORG");
@@ -796,10 +773,8 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 		IBundleProvider history = myPatientDao.history(id, null, null, null, mySrd);
 		assertEquals(2, history.size().intValue());
 
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get((IResource) history.getResources(0, 1).get(0)));
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get((IResource) history.getResources(0, 1).get(0)).getValue());
-		assertNull(ResourceMetadataKeyEnum.DELETED_AT.get((IResource) history.getResources(1, 2).get(0)));
-
+		assertTrue(history.getResources(0, 1).get(0).isDeleted());
+		assertFalse(history.getResources(1, 2).get(0).isDeleted());
 	}
 
 	@Test
@@ -1033,7 +1008,7 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 
 	@Test
 	public void testHistoryOverMultiplePages() throws Exception {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 		String methodName = "testHistoryOverMultiplePages";
 
 		Patient patient = new Patient();
@@ -1206,13 +1181,13 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 		assertEquals(id.withVersion("2"), entries.get(1).getIdElement());
 		assertEquals(id.withVersion("1"), entries.get(2).getIdElement());
 
-		assertNull(ResourceMetadataKeyEnum.DELETED_AT.get((IResource) entries.get(0)));
+		assertFalse(entries.get(0).isDeleted());
 		assertEquals(BundleEntryTransactionMethodEnum.PUT, ResourceMetadataKeyEnum.ENTRY_TRANSACTION_METHOD.get((IResource) entries.get(0)));
 
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get((IResource) entries.get(1)));
+		assertTrue(entries.get(1).isDeleted());
 		assertEquals(BundleEntryTransactionMethodEnum.DELETE, ResourceMetadataKeyEnum.ENTRY_TRANSACTION_METHOD.get((IResource) entries.get(1)));
 
-		assertNull(ResourceMetadataKeyEnum.DELETED_AT.get((IResource) entries.get(2)));
+		assertFalse(entries.get(2).isDeleted());
 		assertEquals(BundleEntryTransactionMethodEnum.POST, ResourceMetadataKeyEnum.ENTRY_TRANSACTION_METHOD.get((IResource) entries.get(2)));
 	}
 
@@ -2679,7 +2654,7 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 
 	@Test
 	public void testStringParamWhichIsTooLong() {
-		myDaoConfig.setAdvancedHSearchIndexing(false);
+		myStorageSettings.setAdvancedHSearchIndexing(false);
 
 		Organization org = new Organization();
 		String str = "testStringParamLong__lvdaoy843s89tll8gvs89l4s3gelrukveilufyebrew8r87bv4b77feli7fsl4lv3vb7rexloxe7olb48vov4o78ls7bvo7vb48o48l4bb7vbvx";
@@ -2828,7 +2803,7 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 
 	@Test
 	public void testValidateAgainstDstu2Profile() throws Exception {
-		myDaoConfig.setAllowExternalReferences(true);
+		myStorageSettings.setAllowExternalReferences(true);
 
 		String stream = loadResource("/binu_testpatient_structuredefinition_dstu2.xml");
 
@@ -2837,12 +2812,10 @@ public class FhirResourceDaoDstu2Test extends BaseJpaDstu2Test {
 
 		String rawResource = loadResource("/binu_testpatient_resource.json");
 		IBaseResource parsedResource = myFhirContext.newJsonParser().parseResource(rawResource);
-		try {
-			myPatientDao.validate((Patient) parsedResource, null, rawResource, EncodingEnum.JSON, ValidationModeEnum.UPDATE, null, mySrd);
-			fail();
-		} catch (PreconditionFailedException e) {
-			ourLog.debug(myFhirContext.newXmlParser().setPrettyPrint(true).encodeResourceToString(e.getOperationOutcome()));
-		}
+		MethodOutcome result = myPatientDao.validate((Patient) parsedResource, null, rawResource, EncodingEnum.JSON, ValidationModeEnum.UPDATE, null, mySrd);
+		OperationOutcome oo = (OperationOutcome) result.getOperationOutcome();
+		assertHasErrors(oo);
+		ourLog.debug(myFhirContext.newXmlParser().setPrettyPrint(true).encodeResourceToString(oo));
 	}
 
 }

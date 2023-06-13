@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.provider;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server
@@ -19,14 +17,16 @@ package ca.uhn.fhir.jpa.provider;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.provider;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.ConceptValidationOptions;
 import ca.uhn.fhir.context.support.IValidationSupport;
+import ca.uhn.fhir.context.support.IValidationSupport.CodeValidationResult;
 import ca.uhn.fhir.context.support.ValidationSupportContext;
 import ca.uhn.fhir.context.support.ValueSetExpansionOptions;
 import ca.uhn.fhir.i18n.Msg;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDaoValueSet;
 import ca.uhn.fhir.jpa.config.JpaConfig;
@@ -39,6 +39,7 @@ import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.provider.ProviderConstants;
 import ca.uhn.fhir.util.ParametersUtil;
+import com.google.common.annotations.VisibleForTesting;
 import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
 import org.hl7.fhir.instance.model.api.IBaseCoding;
 import org.hl7.fhir.instance.model.api.IBaseParameters;
@@ -53,6 +54,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 
 import javax.servlet.http.HttpServletRequest;
 
+import java.util.Optional;
+import java.util.function.Supplier;
+
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 public class ValueSetOperationProvider extends BaseJpaProvider {
@@ -61,8 +65,6 @@ public class ValueSetOperationProvider extends BaseJpaProvider {
 	@Autowired
 	protected IValidationSupport myValidationSupport;
 	@Autowired
-	private DaoConfig myDaoConfig;
-	@Autowired
 	private DaoRegistry myDaoRegistry;
 	@Autowired
 	private ITermReadSvc myTermReadSvc;
@@ -70,24 +72,13 @@ public class ValueSetOperationProvider extends BaseJpaProvider {
 	@Qualifier(JpaConfig.JPA_VALIDATION_SUPPORT_CHAIN)
 	private ValidationSupportChain myValidationSupportChain;
 
-	public void setValidationSupport(IValidationSupport theValidationSupport) {
-		myValidationSupport = theValidationSupport;
-	}
-
-	public void setDaoConfig(DaoConfig theDaoConfig) {
-		myDaoConfig = theDaoConfig;
-	}
-
-	public void setDaoRegistry(DaoRegistry theDaoRegistry) {
+	@VisibleForTesting
+	public void setDaoRegistryForUnitTest(DaoRegistry theDaoRegistry) {
 		myDaoRegistry = theDaoRegistry;
 	}
 
-	public void setTermReadSvc(ITermReadSvc theTermReadSvc) {
-		myTermReadSvc = theTermReadSvc;
-	}
-
-	public void setValidationSupportChain(ValidationSupportChain theValidationSupportChain) {
-		myValidationSupportChain = theValidationSupportChain;
+	public void setValidationSupport(IValidationSupport theValidationSupport) {
+		myValidationSupport = theValidationSupport;
 	}
 
 	@Operation(name = JpaConstants.OPERATION_EXPAND, idempotent = true, typeName = "ValueSet")
@@ -141,7 +132,7 @@ public class ValueSetOperationProvider extends BaseJpaProvider {
 		RequestDetails theRequestDetails
 	) {
 
-		IValidationSupport.CodeValidationResult result;
+		CodeValidationResult result;
 		startRequest(theServletRequest);
 		try {
 			// If a Remote Terminology Server has been configured, use it
@@ -151,8 +142,20 @@ public class ValueSetOperationProvider extends BaseJpaProvider {
 				String theDisplayString = (theDisplay != null && theDisplay.hasValue()) ? theDisplay.getValueAsString() : null;
 				String theValueSetUrlString = (theValueSetUrl != null && theValueSetUrl.hasValue()) ?
 					theValueSetUrl.getValueAsString() : null;
-				result = myValidationSupportChain.validateCode(new ValidationSupportContext(myValidationSupportChain),
-					new ConceptValidationOptions(), theSystemString, theCodeString, theDisplayString, theValueSetUrlString);
+				if (theCoding != null) {
+					if (isNotBlank(theCoding.getSystem())) {
+						if (theSystemString != null && !theSystemString.equalsIgnoreCase(theCoding.getSystem())) {
+							throw new InvalidRequestException(Msg.code(2352) + "Coding.system '" + theCoding.getSystem() +
+								"' does not equal param system '" + theSystemString + "'. Unable to validate-code.");
+						}
+						theSystemString = theCoding.getSystem();
+						theCodeString = theCoding.getCode();
+						theDisplayString = theCoding.getDisplay();
+					}
+				}
+
+				result = validateCodeWithTerminologyService(theSystemString, theCodeString, theDisplayString, theValueSetUrlString)
+					.orElseGet(supplyUnableToValidateResult(theSystemString, theCodeString, theValueSetUrlString));
 			} else {
 				// Otherwise, use the local DAO layer to validate the code
 				IFhirResourceDaoValueSet<IBaseResource> dao = getDao();
@@ -178,6 +181,17 @@ public class ValueSetOperationProvider extends BaseJpaProvider {
 		}
 	}
 
+	private Optional<CodeValidationResult> validateCodeWithTerminologyService(String theSystem, String theCode,
+																									  String theDisplay, String theValueSetUrl) {
+		return Optional.ofNullable(myValidationSupportChain.validateCode(new ValidationSupportContext(myValidationSupportChain),
+			new ConceptValidationOptions(), theSystem, theCode, theDisplay, theValueSetUrl));
+	}
+
+	private Supplier<CodeValidationResult> supplyUnableToValidateResult(String theSystem, String theCode, String theValueSetUrl) {
+		return () -> new CodeValidationResult().setMessage("Validator is unable to provide validation for " +
+			theCode + "#" + theSystem + " - Unknown or unusable ValueSet[" + theValueSetUrl + "]");
+	}
+
 	@Operation(name = ProviderConstants.OPERATION_INVALIDATE_EXPANSION, idempotent = false, typeName = "ValueSet", returnParameters = {
 		@OperationParam(name = "message", typeName = "string", min = 1, max = 1)
 	})
@@ -200,8 +214,8 @@ public class ValueSetOperationProvider extends BaseJpaProvider {
 	}
 
 
-	public static ValueSetExpansionOptions createValueSetExpansionOptions(DaoConfig theDaoConfig, IPrimitiveType<Integer> theOffset, IPrimitiveType<Integer> theCount, IPrimitiveType<Boolean> theIncludeHierarchy, IPrimitiveType<String> theFilter, IPrimitiveType<String> theDisplayLanguage) {
-		int offset = theDaoConfig.getPreExpandValueSetsDefaultOffset();
+	public static ValueSetExpansionOptions createValueSetExpansionOptions(JpaStorageSettings theStorageSettings, IPrimitiveType<Integer> theOffset, IPrimitiveType<Integer> theCount, IPrimitiveType<Boolean> theIncludeHierarchy, IPrimitiveType<String> theFilter, IPrimitiveType<String> theDisplayLanguage) {
+		int offset = theStorageSettings.getPreExpandValueSetsDefaultOffset();
 		if (theOffset != null && theOffset.hasValue()) {
 			if (theOffset.getValue() >= 0) {
 				offset = theOffset.getValue();
@@ -210,7 +224,7 @@ public class ValueSetOperationProvider extends BaseJpaProvider {
 			}
 		}
 
-		int count = theDaoConfig.getPreExpandValueSetsDefaultCount();
+		int count = theStorageSettings.getPreExpandValueSetsDefaultCount();
 		if (theCount != null && theCount.hasValue()) {
 			if (theCount.getValue() >= 0) {
 				count = theCount.getValue();
@@ -218,7 +232,7 @@ public class ValueSetOperationProvider extends BaseJpaProvider {
 				throw new InvalidRequestException(Msg.code(1136) + "count parameter for $expand operation must be >= 0 when specified. count: " + theCount.getValue());
 			}
 		}
-		int countMax = theDaoConfig.getPreExpandValueSetsMaxCount();
+		int countMax = theStorageSettings.getPreExpandValueSetsMaxCount();
 		if (count > countMax) {
 			ourLog.warn("count parameter for $expand operation of {} exceeds maximum value of {}; using maximum value.", count, countMax);
 			count = countMax;
@@ -241,7 +255,7 @@ public class ValueSetOperationProvider extends BaseJpaProvider {
 		return options;
 	}
 
-	public static IBaseParameters toValidateCodeResult(FhirContext theContext, IValidationSupport.CodeValidationResult theResult) {
+	public static IBaseParameters toValidateCodeResult(FhirContext theContext, CodeValidationResult theResult) {
 		IBaseParameters retVal = ParametersUtil.newInstance(theContext);
 
 		ParametersUtil.addParameterToParametersBoolean(theContext, retVal, "result", theResult.isOk());

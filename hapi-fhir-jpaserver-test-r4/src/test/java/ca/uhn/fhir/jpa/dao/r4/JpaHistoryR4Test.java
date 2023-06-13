@@ -1,6 +1,6 @@
 package ca.uhn.fhir.jpa.dao.r4;
 
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.model.HistoryCountModeEnum;
 import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
@@ -35,12 +35,12 @@ public class JpaHistoryR4Test extends BaseJpaR4SystemTest {
 
 	@AfterEach
 	public void after() {
-		myDaoConfig.setHistoryCountMode(DaoConfig.DEFAULT_HISTORY_COUNT_MODE);
+		myStorageSettings.setHistoryCountMode(JpaStorageSettings.DEFAULT_HISTORY_COUNT_MODE);
 	}
 
 	@Test
 	public void testTypeHistory_TotalDisabled() {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_DISABLED);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_DISABLED);
 		create20Patients();
 
 		/*
@@ -67,8 +67,16 @@ public class JpaHistoryR4Test extends BaseJpaR4SystemTest {
 
 	@Test
 	public void testTypeHistory_CountAccurate() {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		runInTransaction(()->{
+			assertEquals(0, myResourceHistoryTableDao.count());
+		});
+
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 		create20Patients();
+
+		runInTransaction(()->{
+			assertEquals(20, myResourceHistoryTableDao.count());
+		});
 
 		/*
 		 * Perform initial history

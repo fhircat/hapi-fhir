@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.mdm.svc;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server - Master Data Management
@@ -19,6 +17,7 @@ package ca.uhn.fhir.jpa.mdm.svc;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.mdm.svc;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.RuntimeResourceDefinition;
@@ -84,6 +83,6 @@ public class GoldenResourceSearchSvcImpl implements IGoldenResourceSearchSvc {
 			lastDate = dao.readByPid(ids.get(ids.size() - 1)).getMeta().getLastUpdated();
 		}
 
-		return new HomogeneousResourcePidList(theResourceType, ids, lastDate);
+		return new HomogeneousResourcePidList(theResourceType, ids, lastDate, theRequestPartitionId);
 	}
 }

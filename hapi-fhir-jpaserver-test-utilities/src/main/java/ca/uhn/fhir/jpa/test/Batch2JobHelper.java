@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.test;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server Test Utilities
@@ -19,6 +17,7 @@ package ca.uhn.fhir.jpa.test;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.test;
 
 import ca.uhn.fhir.batch2.api.IJobCoordinator;
 import ca.uhn.fhir.batch2.api.IJobMaintenanceService;
@@ -60,7 +59,7 @@ public class Batch2JobHelper {
 	}
 
 	public JobInstance awaitJobCompletion(Batch2JobStartResponse theStartResponse) {
-		return awaitJobCompletion(theStartResponse.getJobId());
+		return awaitJobCompletion(theStartResponse.getInstanceId());
 	}
 
 	public JobInstance awaitJobCompletion(String theBatchJobId) {
@@ -93,14 +92,28 @@ public class Batch2JobHelper {
 		try {
 			await()
 				.atMost(theSecondsToWait, TimeUnit.SECONDS)
-				.until(() -> checkStatusWithMaintenancePass(theBatchJobId, theExpectedStatus));
+				.until(() -> {
+					boolean inFinalStatus = false;
+					if (ArrayUtils.contains(theExpectedStatus, StatusEnum.COMPLETED) && !ArrayUtils.contains(theExpectedStatus, StatusEnum.FAILED)) {
+						inFinalStatus = hasStatus(theBatchJobId, StatusEnum.FAILED);
+					}
+					if (ArrayUtils.contains(theExpectedStatus, StatusEnum.FAILED) && !ArrayUtils.contains(theExpectedStatus, StatusEnum.COMPLETED)) {
+						inFinalStatus = hasStatus(theBatchJobId, StatusEnum.COMPLETED);
+					}
+					boolean retVal = checkStatusWithMaintenancePass(theBatchJobId, theExpectedStatus);
+					if (!retVal && inFinalStatus) {
+						// Fail fast - If we hit one of these statuses and it's not the one we want, abort
+						throw new ConditionTimeoutException("Already in failed/completed status");
+					}
+					return retVal;
+				});
 		} catch (ConditionTimeoutException e) {
 			String statuses = myJobPersistence.fetchInstances(100, 0)
 				.stream()
 				.map(t -> t.getJobDefinitionId() + "/" + t.getStatus().name())
 				.collect(Collectors.joining("\n"));
 			String currentStatus = myJobCoordinator.getInstance(theBatchJobId).getStatus().name();
-			fail("Job still has status " + currentStatus + " - All statuses:\n" + statuses);
+			fail("Job " + theBatchJobId + " still has status " + currentStatus + " - All statuses:\n" + statuses);
 		}
 		return myJobCoordinator.getInstance(theBatchJobId);
 	}
@@ -123,7 +136,7 @@ public class Batch2JobHelper {
 		return myJobCoordinator.getInstance(theBatchJobId);
 	}
 
-	private boolean checkStatusWithMaintenancePass(String theBatchJobId, StatusEnum... theExpectedStatuses) {
+	private boolean checkStatusWithMaintenancePass(String theBatchJobId, StatusEnum... theExpectedStatuses) throws InterruptedException {
 		if (hasStatus(theBatchJobId, theExpectedStatuses)) {
 			return true;
 		}
@@ -131,8 +144,10 @@ public class Batch2JobHelper {
 		return hasStatus(theBatchJobId, theExpectedStatuses);
 	}
 
-	private boolean hasStatus(String theBatchJobId, StatusEnum[] theExpectedStatuses) {
-		return ArrayUtils.contains(theExpectedStatuses, getStatus(theBatchJobId));
+	private boolean hasStatus(String theBatchJobId, StatusEnum... theExpectedStatuses) {
+		StatusEnum status = getStatus(theBatchJobId);
+		ourLog.debug("Checking status of {} in {}: is {}", theBatchJobId, theExpectedStatuses, status);
+		return ArrayUtils.contains(theExpectedStatuses, status);
 	}
 
 	private StatusEnum getStatus(String theBatchJobId) {
@@ -140,7 +155,7 @@ public class Batch2JobHelper {
 	}
 
 	public JobInstance awaitJobFailure(Batch2JobStartResponse theStartResponse) {
-		return awaitJobFailure(theStartResponse.getJobId());
+		return awaitJobFailure(theStartResponse.getInstanceId());
 	}
 
 	public JobInstance awaitJobFailure(String theJobId) {

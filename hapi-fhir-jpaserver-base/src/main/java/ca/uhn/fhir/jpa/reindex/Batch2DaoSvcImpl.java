@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.reindex;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server
@@ -19,6 +17,7 @@ package ca.uhn.fhir.jpa.reindex;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.reindex;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.RuntimeResourceDefinition;
@@ -31,6 +30,7 @@ import ca.uhn.fhir.jpa.api.pid.IResourcePidList;
 import ca.uhn.fhir.jpa.api.pid.MixedResourcePidList;
 import ca.uhn.fhir.jpa.api.svc.IBatch2DaoSvc;
 import ca.uhn.fhir.jpa.dao.data.IResourceTableDao;
+import ca.uhn.fhir.jpa.dao.tx.IHapiTransactionService;
 import ca.uhn.fhir.jpa.model.dao.JpaPid;
 import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.jpa.searchparam.MatchUrlService;
@@ -67,20 +67,26 @@ public class Batch2DaoSvcImpl implements IBatch2DaoSvc {
 	@Autowired
 	private FhirContext myFhirContext;
 
+	@Autowired
+	private IHapiTransactionService myTransactionService;
+
 	@Override
 	public boolean isAllResourceTypeSupported() {
 		return true;
 	}
 
 	@Override
-	@Transactional
 	public IResourcePidList fetchResourceIdsPage(Date theStart, Date theEnd, @Nonnull Integer thePageSize, @Nullable RequestPartitionId theRequestPartitionId, @Nullable String theUrl) {
-
-		if (theUrl == null) {
-			return fetchResourceIdsPageNoUrl(theStart, theEnd, thePageSize, theRequestPartitionId);
-		} else {
-			return fetchResourceIdsPageWithUrl(theStart, theEnd, thePageSize, theUrl, theRequestPartitionId);
-		}
+		return myTransactionService
+			.withSystemRequest()
+			.withRequestPartitionId(theRequestPartitionId)
+ 			.execute(()->{
+				if (theUrl == null) {
+					return fetchResourceIdsPageNoUrl(theStart, theEnd, thePageSize, theRequestPartitionId);
+				} else {
+					return fetchResourceIdsPageWithUrl(theStart, theEnd, thePageSize, theUrl, theRequestPartitionId);
+				}
+			});
 	}
 
 	private IResourcePidList fetchResourceIdsPageWithUrl(Date theStart, Date theEnd, int thePageSize, String theUrl, RequestPartitionId theRequestPartitionId) {
@@ -105,7 +111,7 @@ public class Batch2DaoSvcImpl implements IBatch2DaoSvc {
 			lastDate = dao.readByPid(lastResourcePersistentId, true).getMeta().getLastUpdated();
 		}
 
-		return new HomogeneousResourcePidList(resourceType, ids, lastDate);
+		return new HomogeneousResourcePidList(resourceType, ids, lastDate, theRequestPartitionId);
 	}
 
 	@Nonnull
@@ -137,6 +143,6 @@ public class Batch2DaoSvcImpl implements IBatch2DaoSvc {
 
 		Date lastDate = (Date) content.get(content.size() - 1)[2];
 
-		return new MixedResourcePidList(types, ids, lastDate);
+		return new MixedResourcePidList(types, ids, lastDate, theRequestPartitionId);
 	}
 }

@@ -1,5 +1,3 @@
-package ca.uhn.fhir.batch2.jobs.parameters;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server - Batch2 Task Processor
@@ -19,6 +17,7 @@ package ca.uhn.fhir.batch2.jobs.parameters;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.batch2.jobs.parameters;
 
 import ca.uhn.fhir.jpa.api.svc.IBatch2DaoSvc;
 
@@ -28,7 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class UrlListValidator {
+public class UrlListValidator implements IUrlListValidator {
 	private final String myOperationName;
 	private final IBatch2DaoSvc myBatch2DaoSvc;
 
@@ -39,6 +38,7 @@ public class UrlListValidator {
 
 
 	@Nullable
+	@Override
 	public List<String> validateUrls(@Nonnull List<String> theUrls) {
 			if (theUrls.isEmpty()) {
 				if (!myBatch2DaoSvc.isAllResourceTypeSupported()) {
@@ -49,6 +49,7 @@ public class UrlListValidator {
 	}
 
 	@Nullable
+	@Override
 	public List<String> validatePartitionedUrls(@Nonnull List<PartitionedUrl> thePartitionedUrls) {
 		List<String> urls = thePartitionedUrls.stream().map(PartitionedUrl::getUrl).collect(Collectors.toList());
 		return validateUrls(urls);

@@ -1,9 +1,9 @@
 package ca.uhn.fhir.jpa.dao.dstu3;
 
 import ca.uhn.fhir.i18n.Msg;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
-import ca.uhn.fhir.jpa.api.config.DaoConfig.ClientIdStrategyEnum;
-import ca.uhn.fhir.jpa.api.config.DaoConfig.IdStrategyEnum;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings.ClientIdStrategyEnum;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings.IdStrategyEnum;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.api.model.DaoMethodOutcome;
 import ca.uhn.fhir.jpa.api.model.HistoryCountModeEnum;
@@ -134,40 +134,15 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 
 	@AfterEach
 	public final void after() {
-		myDaoConfig.setAllowExternalReferences(new DaoConfig().isAllowExternalReferences());
-		myDaoConfig.setTreatReferencesAsLogical(new DaoConfig().getTreatReferencesAsLogical());
-		myDaoConfig.setIndexMissingFields(new DaoConfig().getIndexMissingFields());
-		myDaoConfig.setHistoryCountMode(DaoConfig.DEFAULT_HISTORY_COUNT_MODE);
+		myStorageSettings.setAllowExternalReferences(new JpaStorageSettings().isAllowExternalReferences());
+		myStorageSettings.setTreatReferencesAsLogical(new JpaStorageSettings().getTreatReferencesAsLogical());
+		myStorageSettings.setIndexMissingFields(new JpaStorageSettings().getIndexMissingFields());
+		myStorageSettings.setHistoryCountMode(JpaStorageSettings.DEFAULT_HISTORY_COUNT_MODE);
 	}
-
-	private void assertGone(IIdType theId) {
-		try {
-			assertNotGone(theId);
-			fail();
-		} catch (ResourceGoneException e) {
-			// good
-		}
-	}
-
-	/**
-	 * This gets called from assertGone too! Careful about exceptions...
-	 */
-	private void assertNotGone(IIdType theId) {
-		if ("Patient".equals(theId.getResourceType())) {
-			myPatientDao.read(theId, mySrd);
-		} else if ("Organization".equals(theId.getResourceType())) {
-			myOrganizationDao.read(theId, mySrd);
-		} else if ("CodeSystem".equals(theId.getResourceType())) {
-			myCodeSystemDao.read(theId, mySrd);
-		} else {
-			fail("Can't handle type: " + theId.getResourceType());
-		}
-	}
-
 
 	@BeforeEach
 	public void beforeDisableResultReuse() {
-		myDaoConfig.setReuseCachedSearchResultsForMillis(null);
+		myStorageSettings.setReuseCachedSearchResultsForMillis(null);
 	}
 
 	private List<String> extractNames(IBundleProvider theSearch) {
@@ -565,8 +540,8 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 
 		@AfterEach
 		void tearDown() {
-			myDaoConfig.setResourceClientIdStrategy(new DaoConfig().getResourceClientIdStrategy());
-			myDaoConfig.setResourceServerIdStrategy(new DaoConfig().getResourceServerIdStrategy());
+			myStorageSettings.setResourceClientIdStrategy(new JpaStorageSettings().getResourceClientIdStrategy());
+			myStorageSettings.setResourceServerIdStrategy(new JpaStorageSettings().getResourceServerIdStrategy());
 		}
 
 		@ParameterizedTest
@@ -592,8 +567,8 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 			String theClientId
 		) {
 			// given id configuration settings
-			myDaoConfig.setResourceClientIdStrategy(theClientIdStrategy);
-			myDaoConfig.setResourceServerIdStrategy(theServerIdStrategy);
+			myStorageSettings.setResourceClientIdStrategy(theClientIdStrategy);
+			myStorageSettings.setResourceServerIdStrategy(theServerIdStrategy);
 
 			// create the resource with POST or PUT
 			Patient pat = new Patient();
@@ -1007,7 +982,7 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 
 	@Test
 	public void testDeleteResource() {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		int initialHistory = myPatientDao.history(null, null, null, mySrd).size();
 
@@ -1055,7 +1030,7 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 		IBundleProvider history = myPatientDao.history(null, null, null, mySrd);
 		assertEquals(4 + initialHistory, history.size().intValue());
 		List<IBaseResource> resources = history.getResources(0, 4);
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get(resources.get(0)));
+		assertTrue(resources.get(0).isDeleted());
 
 		try {
 			myPatientDao.delete(id2, mySrd);
@@ -1164,10 +1139,8 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 		IBundleProvider history = myPatientDao.history(id, null, null, null, mySrd);
 		assertEquals(2, history.size().intValue());
 
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get(history.getResources(0, 1).get(0)));
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get(history.getResources(0, 1).get(0)).getValue());
-		assertNull(ResourceMetadataKeyEnum.DELETED_AT.get(history.getResources(1, 2).get(0)));
-
+		assertTrue(history.getResources(0, 1).get(0).isDeleted());
+		assertFalse(history.getResources(1, 2).get(0).isDeleted());
 	}
 
 	@Test
@@ -1395,8 +1368,8 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 
 	@Test
 	public void testHistoryOverMultiplePages() throws Exception {
-		myDaoConfig.setIndexMissingFields(DaoConfig.IndexEnabledEnum.DISABLED);
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setIndexMissingFields(JpaStorageSettings.IndexEnabledEnum.DISABLED);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		String methodName = "testHistoryOverMultiplePages";
 
@@ -1548,7 +1521,7 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 
 	@Test
 	public void testHistoryReflectsMetaOperations() {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		Patient inPatient = new Patient();
 		inPatient.addName().setFamily("version1");
@@ -1622,19 +1595,19 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 		assertEquals(id.withVersion("2"), entries.get(1).getIdElement());
 		assertEquals(id.withVersion("1"), entries.get(2).getIdElement());
 
-		assertNull(ResourceMetadataKeyEnum.DELETED_AT.get(entries.get(0)));
+		assertFalse(entries.get(0).isDeleted());
 		assertEquals(BundleEntryTransactionMethodEnum.PUT, ResourceMetadataKeyEnum.ENTRY_TRANSACTION_METHOD.get(entries.get(0)));
 
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get(entries.get(1)));
+		assertTrue(entries.get(1).isDeleted());
 		assertEquals(BundleEntryTransactionMethodEnum.DELETE, ResourceMetadataKeyEnum.ENTRY_TRANSACTION_METHOD.get(entries.get(1)));
 
-		assertNull(ResourceMetadataKeyEnum.DELETED_AT.get(entries.get(2)));
+		assertFalse(entries.get(2).isDeleted());
 		assertEquals(BundleEntryTransactionMethodEnum.POST, ResourceMetadataKeyEnum.ENTRY_TRANSACTION_METHOD.get(entries.get(2)));
 	}
 
 	@Test
 	public void testHistoryWithFromAndTo() throws Exception {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		String methodName = "testHistoryWithFromAndTo";
 
@@ -1671,7 +1644,7 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 
 	@Test
 	public void testHistoryWithFutureSinceDate() throws Exception {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		Date before = new Date();
 		Thread.sleep(10);
@@ -1993,8 +1966,8 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 	 */
 	@Test
 	public void testLogicalReferencesAreSearchable() {
-		myDaoConfig.setTreatReferencesAsLogical(null);
-		myDaoConfig.addTreatReferencesAsLogical("http://foo.com/identifier*");
+		myStorageSettings.setTreatReferencesAsLogical(null);
+		myStorageSettings.addTreatReferencesAsLogical("http://foo.com/identifier*");
 
 		Patient p1 = new Patient();
 		p1.getManagingOrganization().setReference("http://foo.com/identifier/1");

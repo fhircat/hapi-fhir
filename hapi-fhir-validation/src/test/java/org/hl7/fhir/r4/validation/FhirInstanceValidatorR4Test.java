@@ -432,7 +432,7 @@ public class FhirInstanceValidatorR4Test extends BaseTest {
 		ValidationResult result = val.validateWithResult(operationDefinition);
 		List<SingleValidationMessage> all = logResultsAndReturnAll(result);
 		assertFalse(result.isSuccessful());
-		assertEquals("This property must be an Array, not a Primitive property", all.get(0).getMessage());
+		assertEquals("The property resource  must be a JSON Array, not a Primitive property (at OperationDefinition)", all.get(0).getMessage());
 	}
 
 	@Test
@@ -1040,7 +1040,7 @@ public class FhirInstanceValidatorR4Test extends BaseTest {
 		ourLog.info(output.getMessages().get(0).getLocationString());
 		ourLog.info(output.getMessages().get(0).getMessage());
 		assertEquals("/f:Patient", output.getMessages().get(0).getLocationString());
-		assertEquals("Undefined element 'foo'", output.getMessages().get(0).getMessage());
+		assertEquals("Undefined element 'foo' at /f:Patient", output.getMessages().get(0).getMessage());
 		assertEquals(28, output.getMessages().get(0).getLocationCol().intValue());
 		assertEquals(4, output.getMessages().get(0).getLocationLine().intValue());
 	}

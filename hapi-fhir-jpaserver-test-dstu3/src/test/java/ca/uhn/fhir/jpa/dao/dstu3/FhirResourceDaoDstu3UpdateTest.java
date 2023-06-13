@@ -1,7 +1,7 @@
 package ca.uhn.fhir.jpa.dao.dstu3;
 
 import ca.uhn.fhir.i18n.Msg;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.model.dao.JpaPid;
 import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.jpa.test.BaseJpaDstu3Test;
@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.UUID;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -42,6 +43,11 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 public class FhirResourceDaoDstu3UpdateTest extends BaseJpaDstu3Test {
 	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(FhirResourceDaoDstu3UpdateTest.class);
+
+	@AfterEach
+	public void afterEach(){
+		myStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.SEQUENTIAL_NUMERIC);
+	}
 
 	@Test
 	public void testReCreateMatchResource() {
@@ -131,12 +137,12 @@ public class FhirResourceDaoDstu3UpdateTest extends BaseJpaDstu3Test {
 
 	@AfterEach
 	public void afterResetDao() {
-		myDaoConfig.setResourceMetaCountHardLimit(new DaoConfig().getResourceMetaCountHardLimit());
+		myStorageSettings.setResourceMetaCountHardLimit(new JpaStorageSettings().getResourceMetaCountHardLimit());
 	}
 	
 	@Test
 	public void testHardMetaCapIsEnforcedOnCreate() {
-		myDaoConfig.setResourceMetaCountHardLimit(3);
+		myStorageSettings.setResourceMetaCountHardLimit(3);
 
 		IIdType id;
 		{
@@ -157,7 +163,7 @@ public class FhirResourceDaoDstu3UpdateTest extends BaseJpaDstu3Test {
 	
 	@Test
 	public void testHardMetaCapIsEnforcedOnMetaAdd() {
-		myDaoConfig.setResourceMetaCountHardLimit(3);
+		myStorageSettings.setResourceMetaCountHardLimit(3);
 
 		IIdType id;
 		{
@@ -644,7 +650,7 @@ public class FhirResourceDaoDstu3UpdateTest extends BaseJpaDstu3Test {
 
 	@Test
 	public void testUpdateWithNoChangeDetectionDisabledUpdateUnchanged() {
-		myDaoConfig.setSuppressUpdatesWithNoChange(false);
+		myStorageSettings.setSuppressUpdatesWithNoChange(false);
 
 		String name = "testUpdateUnchanged";
 		IIdType id1, id2;
@@ -825,6 +831,26 @@ public class FhirResourceDaoDstu3UpdateTest extends BaseJpaDstu3Test {
 		assertEquals("Patient/123abc", p.getIdElement().toUnqualifiedVersionless().getValue());
 		assertEquals("Hello", p.getName().get(0).getFamily());
 
+	}
+
+	@Test
+	void testCreateWithConditionalUpdate_withUuidAsServerResourceStrategyAndNoIdProvided_uuidAssignedAsResourceId() {
+		// setup
+		myStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
+		Patient p = new Patient();
+		p.addIdentifier().setSystem("http://my-lab-system").setValue("123");
+		p.addName().setFamily("FAM");
+		String theMatchUrl = "Patient?identifier=http://my-lab-system|123";
+
+		// execute
+		String result = myPatientDao.update(p, theMatchUrl, mySrd).getId().getIdPart();
+
+		// verify
+		try {
+			UUID.fromString(result);
+		} catch (IllegalArgumentException exception){
+			fail("Result id is not a UUID. Instead, it was: " + result);
+		}
 	}
 
 }

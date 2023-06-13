@@ -2,7 +2,7 @@ package ca.uhn.fhir.jpa.dao.r4;
 
 import ca.uhn.fhir.i18n.Msg;
 import ca.uhn.fhir.interceptor.model.RequestPartitionId;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.api.model.HistoryCountModeEnum;
 import ca.uhn.fhir.jpa.dao.BaseHapiFhirDao;
@@ -167,44 +167,20 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@AfterEach
 	public final void after() {
-		myDaoConfig.setAllowExternalReferences(new DaoConfig().isAllowExternalReferences());
-		myDaoConfig.setTreatReferencesAsLogical(new DaoConfig().getTreatReferencesAsLogical());
-		myDaoConfig.setEnforceReferentialIntegrityOnDelete(new DaoConfig().isEnforceReferentialIntegrityOnDelete());
-		myDaoConfig.setEnforceReferenceTargetTypes(new DaoConfig().isEnforceReferenceTargetTypes());
-		myDaoConfig.setIndexMissingFields(new DaoConfig().getIndexMissingFields());
-		myDaoConfig.setInternalSynchronousSearchSize(new DaoConfig().getInternalSynchronousSearchSize());
-		myModelConfig.setNormalizedQuantitySearchLevel(NormalizedQuantitySearchLevel.NORMALIZED_QUANTITY_SEARCH_NOT_SUPPORTED);
-		myDaoConfig.setHistoryCountMode(DaoConfig.DEFAULT_HISTORY_COUNT_MODE);
-		myDaoConfig.setMassIngestionMode(false);
-	}
-
-	private void assertGone(IIdType theId) {
-		try {
-			assertNotGone(theId);
-			fail();
-		} catch (ResourceGoneException e) {
-			// good
-		}
-	}
-
-	/**
-	 * This gets called from assertGone too! Careful about exceptions...
-	 */
-	private void assertNotGone(IIdType theId) {
-		if ("Patient".equals(theId.getResourceType())) {
-			myPatientDao.read(theId, mySrd);
-		} else if ("Organization".equals(theId.getResourceType())) {
-			myOrganizationDao.read(theId, mySrd);
-		} else if ("CodeSystem".equals(theId.getResourceType())) {
-			myCodeSystemDao.read(theId, mySrd);
-		} else {
-			fail("Can't handle type: " + theId.getResourceType());
-		}
+		myStorageSettings.setAllowExternalReferences(new JpaStorageSettings().isAllowExternalReferences());
+		myStorageSettings.setTreatReferencesAsLogical(new JpaStorageSettings().getTreatReferencesAsLogical());
+		myStorageSettings.setEnforceReferentialIntegrityOnDelete(new JpaStorageSettings().isEnforceReferentialIntegrityOnDelete());
+		myStorageSettings.setEnforceReferenceTargetTypes(new JpaStorageSettings().isEnforceReferenceTargetTypes());
+		myStorageSettings.setIndexMissingFields(new JpaStorageSettings().getIndexMissingFields());
+		myStorageSettings.setInternalSynchronousSearchSize(new JpaStorageSettings().getInternalSynchronousSearchSize());
+		myStorageSettings.setNormalizedQuantitySearchLevel(NormalizedQuantitySearchLevel.NORMALIZED_QUANTITY_SEARCH_NOT_SUPPORTED);
+		myStorageSettings.setHistoryCountMode(JpaStorageSettings.DEFAULT_HISTORY_COUNT_MODE);
+		myStorageSettings.setMassIngestionMode(false);
 	}
 
 	@BeforeEach
 	public void beforeDisableResultReuse() {
-		myDaoConfig.setReuseCachedSearchResultsForMillis(null);
+		myStorageSettings.setReuseCachedSearchResultsForMillis(null);
 	}
 
 	private List<String> extractNames(IBundleProvider theSearch) {
@@ -263,7 +239,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@Test
 	public void testDeletedResourcesAreReindexed() {
-		myDaoConfig.setSchedulingDisabled(true);
+		myStorageSettings.setSchedulingDisabled(true);
 
 		Patient pt1 = new Patient();
 		pt1.setActive(true);
@@ -334,11 +310,10 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 		assertEquals("#", observation.getSubject().getReference());
 	}
 
-
 	@Tag("intermittent")
 	//	@Test
 	public void testTermConceptReindexingDoesntDuplicateData() {
-		myDaoConfig.setSchedulingDisabled(true);
+		myStorageSettings.setSchedulingDisabled(true);
 
 
 		CodeSystem cs = new CodeSystem();
@@ -375,7 +350,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@Test
 	public void testMissingVersionsAreReindexed() {
-		myDaoConfig.setSchedulingDisabled(true);
+		myStorageSettings.setSchedulingDisabled(true);
 
 		Patient pt1 = new Patient();
 		pt1.setActive(true);
@@ -618,7 +593,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 	@Test
 	public void testChoiceParamQuantityWithNormalizedQuantitySearchSupported() {
 
-		myModelConfig.setNormalizedQuantitySearchLevel(NormalizedQuantitySearchLevel.NORMALIZED_QUANTITY_SEARCH_SUPPORTED);
+		myStorageSettings.setNormalizedQuantitySearchLevel(NormalizedQuantitySearchLevel.NORMALIZED_QUANTITY_SEARCH_SUPPORTED);
 		Observation o3 = new Observation();
 		o3.getCode().addCoding().setSystem("foo").setCode("testChoiceParam03");
 		o3.setValue(new Quantity(QuantityComparator.GREATER_THAN, 123.0, UcumServiceUtil.UCUM_CODESYSTEM_URL, "cm", "cm")); // 0.0123m
@@ -719,7 +694,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 	@Test
 	public void testChoiceParamQuantityPrecisionWithNormalizedQuantitySearchSupported() {
 
-		myModelConfig.setNormalizedQuantitySearchLevel(NormalizedQuantitySearchLevel.NORMALIZED_QUANTITY_SEARCH_SUPPORTED);
+		myStorageSettings.setNormalizedQuantitySearchLevel(NormalizedQuantitySearchLevel.NORMALIZED_QUANTITY_SEARCH_SUPPORTED);
 		Observation o3 = new Observation();
 		o3.getCode().addCoding().setSystem("foo").setCode("testChoiceParam03");
 		o3.setValue(new Quantity(null, 123.01, UcumServiceUtil.UCUM_CODESYSTEM_URL, "cm", "cm")); // 0.012301 m
@@ -1229,7 +1204,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 		}
 
 		// Disable validation
-		myDaoConfig.setEnforceReferenceTargetTypes(false);
+		myStorageSettings.setEnforceReferenceTargetTypes(false);
 		Patient p = new Patient();
 		p.getManagingOrganization().setReferenceElement(id1);
 		myPatientDao.create(p, mySrd);
@@ -1371,7 +1346,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@Test
 	public void testDeleteResource() {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		int initialHistory = myPatientDao.history(null, null, null, mySrd).size();
 
@@ -1419,7 +1394,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 		IBundleProvider history = myPatientDao.history(null, null, null, mySrd);
 		assertEquals(4 + initialHistory, history.size().intValue());
 		List<IBaseResource> resources = history.getResources(0, 4);
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get(resources.get(0)));
+		assertTrue(resources.get(0).isDeleted());
 
 		try {
 			myPatientDao.delete(id2, mySrd);
@@ -1440,7 +1415,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 	 */
 	@Test
 	public void testDeleteResourceWithOutboundDeletedResources() {
-		myDaoConfig.setEnforceReferentialIntegrityOnDelete(false);
+		myStorageSettings.setEnforceReferentialIntegrityOnDelete(false);
 
 		Organization org = new Organization();
 		org.setId("ORG");
@@ -1594,10 +1569,8 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 		IBundleProvider history = myPatientDao.history(id, null, null, null, mySrd);
 		assertEquals(2, history.size().intValue());
 
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get(history.getResources(0, 1).get(0)));
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get(history.getResources(0, 1).get(0)).getValue());
-		assertNull(ResourceMetadataKeyEnum.DELETED_AT.get(history.getResources(1, 2).get(0)));
-
+		assertTrue(history.getResources(0, 1).get(0).isDeleted());
+		assertFalse(history.getResources(1, 2).get(0).isDeleted());
 	}
 
 	@Test
@@ -1761,7 +1734,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@Test
 	public void testDeleteWithMatchUrlQualifierMissing() {
-		myDaoConfig.setIndexMissingFields(DaoConfig.IndexEnabledEnum.ENABLED);
+		myStorageSettings.setIndexMissingFields(JpaStorageSettings.IndexEnabledEnum.ENABLED);
 
 		String methodName = "testDeleteWithMatchUrlChainedProfile";
 
@@ -1848,7 +1821,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@Test
 	public void testHistoryOverMultiplePages() throws Exception {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		String methodName = "testHistoryOverMultiplePages";
 
@@ -2000,7 +1973,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@Test
 	public void testHistoryReflectsMetaOperations() {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		Patient inPatient = new Patient();
 		inPatient.addName().setFamily("version1");
@@ -2074,19 +2047,19 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 		assertEquals(id.withVersion("2"), entries.get(1).getIdElement());
 		assertEquals(id.withVersion("1"), entries.get(2).getIdElement());
 
-		assertNull(ResourceMetadataKeyEnum.DELETED_AT.get(entries.get(0)));
+		assertFalse(entries.get(0).isDeleted());
 		assertEquals(BundleEntryTransactionMethodEnum.PUT, ResourceMetadataKeyEnum.ENTRY_TRANSACTION_METHOD.get(entries.get(0)));
 
-		assertNotNull(ResourceMetadataKeyEnum.DELETED_AT.get(entries.get(1)));
+		assertTrue(entries.get(1).isDeleted());
 		assertEquals(BundleEntryTransactionMethodEnum.DELETE, ResourceMetadataKeyEnum.ENTRY_TRANSACTION_METHOD.get(entries.get(1)));
 
-		assertNull(ResourceMetadataKeyEnum.DELETED_AT.get(entries.get(2)));
+		assertFalse(entries.get(2).isDeleted());
 		assertEquals(BundleEntryTransactionMethodEnum.POST, ResourceMetadataKeyEnum.ENTRY_TRANSACTION_METHOD.get(entries.get(2)));
 	}
 
 	@Test
 	public void testHistoryWithFromAndTo() throws Exception {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		String methodName = "testHistoryWithFromAndTo";
 
@@ -2122,7 +2095,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@Test
 	public void testHistoryWithFutureSinceDate() throws Exception {
-		myDaoConfig.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
+		myStorageSettings.setHistoryCountMode(HistoryCountModeEnum.COUNT_ACCURATE);
 
 		Date before = new Date();
 		Thread.sleep(10);
@@ -2444,8 +2417,8 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 	 */
 	@Test
 	public void testLogicalReferencesAreSearchable() {
-		myDaoConfig.setTreatReferencesAsLogical(null);
-		myDaoConfig.addTreatReferencesAsLogical("http://foo.com/identifier*");
+		myStorageSettings.setTreatReferencesAsLogical(null);
+		myStorageSettings.addTreatReferencesAsLogical("http://foo.com/identifier*");
 
 		Patient p1 = new Patient();
 		p1.getManagingOrganization().setReference("http://foo.com/identifier/1");
@@ -2500,13 +2473,13 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 	}
 
 	@Test
-	public void testDeleteWithMassInjectionModeEnabled(){
-		myDaoConfig.setMassIngestionMode(true);
+	public void testDeleteWithMassInjectionModeEnabled() {
+		myStorageSettings.setMassIngestionMode(true);
 
 		// given
 		Observation observation = new Observation()
 			.setStatus(ObservationStatus.FINAL)
-			.addCategory(newCodeableConcept("http://somesystem","somecode"))
+			.addCategory(newCodeableConcept("http://somesystem", "somecode"))
 			.setCode(newCodeableConcept("http://loinc.org", "15074-8"));
 
 		// when
@@ -2705,7 +2678,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 		IIdType qid2 = myQuestionnaireDao.create(q, mySrd).getId().toUnqualifiedVersionless();
 
 		IBundleProvider results = myQuestionnaireDao.search(new SearchParameterMap("title", new StringParam("testQuestionnaireTitleGetsIndexedQ_TITLE")).setLoadSynchronous(true));
-		assertEquals(1, results.size().intValue());
+		assertEquals(1, results.sizeOrThrowNpe());
 		assertEquals(qid1, results.getResources(0, 1).get(0).getIdElement().toUnqualifiedVersionless());
 		assertNotEquals(qid2, results.getResources(0, 1).get(0).getIdElement().toUnqualifiedVersionless());
 
@@ -3279,7 +3252,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@Test
 	public void testSortByDate() {
-		myDaoConfig.setIndexMissingFields(DaoConfig.IndexEnabledEnum.ENABLED);
+		myStorageSettings.setIndexMissingFields(JpaStorageSettings.IndexEnabledEnum.ENABLED);
 
 		Patient p = new Patient();
 		p.addIdentifier().setSystem("urn:system").setValue("testtestSortByDate");
@@ -3438,7 +3411,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 	@ParameterizedTest
 	@ValueSource(booleans = {true, false})
 	public void testSortByMissingAttribute(boolean theIndexMissingData) {
-		myDaoConfig.setIndexMissingFields(theIndexMissingData ? DaoConfig.IndexEnabledEnum.ENABLED : DaoConfig.IndexEnabledEnum.DISABLED);
+		myStorageSettings.setIndexMissingFields(theIndexMissingData ? JpaStorageSettings.IndexEnabledEnum.ENABLED : JpaStorageSettings.IndexEnabledEnum.DISABLED);
 
 		Patient p = new Patient();
 		p.setGender(AdministrativeGender.MALE);
@@ -3460,13 +3433,13 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 		actual = toUnqualifiedVersionlessIds(myPatientDao.search(spMap));
 		myCaptureQueriesListener.logSelectQueries();
 		assertEquals(3, actual.size());
-		myDaoConfig.setIndexMissingFields(DaoConfig.IndexEnabledEnum.DISABLED);
+		myStorageSettings.setIndexMissingFields(JpaStorageSettings.IndexEnabledEnum.DISABLED);
 	}
 
 	@ParameterizedTest
 	@ValueSource(booleans = {true, false})
 	public void testSortByMissingAttributeWithChainedSorting(boolean theIndexMissingData) {
-		myDaoConfig.setIndexMissingFields(theIndexMissingData ? DaoConfig.IndexEnabledEnum.ENABLED : DaoConfig.IndexEnabledEnum.DISABLED);
+		myStorageSettings.setIndexMissingFields(theIndexMissingData ? JpaStorageSettings.IndexEnabledEnum.ENABLED : JpaStorageSettings.IndexEnabledEnum.DISABLED);
 
 		Patient p = new Patient();
 		p.addName().addGiven("MalePatientGivenName").setFamily("Bame");
@@ -3495,7 +3468,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 		// assert the sorting order
 		assertThat(actual, hasItems(patient2Id, patient3Id, patient1Id));
 
-		myDaoConfig.setIndexMissingFields(DaoConfig.IndexEnabledEnum.DISABLED);
+		myStorageSettings.setIndexMissingFields(JpaStorageSettings.IndexEnabledEnum.DISABLED);
 	}
 
 	@Test
@@ -3642,7 +3615,6 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 	@Disabled
 	public void testSortByQuantityWithNormalizedQuantitySearchFullSupported() {
 
-//		myModelConfig.setNormalizedQuantitySearchLevel(NormalizedQuantitySearchLevel.NORMALIZED_QUANTITY_SEARCH_FULL_SUPPORTED);
 		Observation res;
 
 		res = new Observation();
@@ -3743,8 +3715,8 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 
 	@Test
 	public void testSortByString01() {
-		myDaoConfig.setIndexMissingFields(DaoConfig.IndexEnabledEnum.ENABLED);
-		myDaoConfig.setAdvancedHSearchIndexing(false);
+		myStorageSettings.setIndexMissingFields(JpaStorageSettings.IndexEnabledEnum.ENABLED);
+		myStorageSettings.setAdvancedHSearchIndexing(false);
 
 		Patient p = new Patient();
 		String string = "testSortByString01";
@@ -4279,7 +4251,7 @@ public class FhirResourceDaoR4Test extends BaseJpaR4Test {
 			search.setStatus(SearchStatusEnum.FAILED);
 			search.setFailureCode(500);
 			search.setFailureMessage("FOO");
-			mySearchCacheSvc.save(search);
+			mySearchCacheSvc.save(search, RequestPartitionId.defaultPartition());
 		});
 
 		IBundleProvider results = myEncounterDao.search(map);

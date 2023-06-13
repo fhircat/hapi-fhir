@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.api.pid;
-
 /*-
  * #%L
  * HAPI FHIR Storage api
@@ -19,9 +17,12 @@ package ca.uhn.fhir.jpa.api.pid;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.api.pid;
 
 import ca.uhn.fhir.i18n.Msg;
+import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.rest.api.server.storage.IResourcePersistentId;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 
 import javax.annotation.Nonnull;
 import java.util.Collections;
@@ -32,6 +33,11 @@ import java.util.List;
  * An empty resource pid list
  */
 public class EmptyResourcePidList implements IResourcePidList {
+	@Override
+	public RequestPartitionId getRequestPartitionId() {
+		return null;
+	}
+
 	@Override
 	public Date getLastDate() {
 		return null;
@@ -61,5 +67,10 @@ public class EmptyResourcePidList implements IResourcePidList {
 	@Override
 	public boolean isEmpty() {
 		return true;
+	}
+
+	@Override
+	public String toString() {
+		return "[empty]";
 	}
 }

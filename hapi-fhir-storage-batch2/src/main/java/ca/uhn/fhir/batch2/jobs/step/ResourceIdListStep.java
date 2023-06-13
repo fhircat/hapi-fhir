@@ -1,5 +1,3 @@
-package ca.uhn.fhir.batch2.jobs.step;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server - Batch2 Task Processor
@@ -19,6 +17,7 @@ package ca.uhn.fhir.batch2.jobs.step;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.batch2.jobs.step;
 
 import ca.uhn.fhir.batch2.api.IJobDataSink;
 import ca.uhn.fhir.batch2.api.IJobStepWorker;
@@ -32,6 +31,7 @@ import ca.uhn.fhir.batch2.jobs.parameters.PartitionedJobParameters;
 import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.jpa.api.pid.IResourcePidList;
 import ca.uhn.fhir.jpa.api.pid.TypedResourcePid;
+import ca.uhn.fhir.system.HapiSystemProperties;
 import ca.uhn.fhir.util.Logs;
 import org.slf4j.Logger;
 
@@ -85,6 +85,11 @@ public class ResourceIdListStep<PT extends PartitionedJobParameters, IT extends 
 			}
 
 			ourLog.info("Found {} IDs from {} to {}", nextChunk.size(), nextStart, nextChunk.getLastDate());
+			if (nextChunk.size() < 10 && HapiSystemProperties.isTestModeEnabled()) {
+				// TODO: I've added this in order to troubleshoot MultitenantBatchOperationR4Test
+				// which is failing intermittently. If that stops, makes sense to remove this
+				ourLog.info(" * PIDS: {}", nextChunk);
+			}
 
 			for (TypedResourcePid typedResourcePid : nextChunk.getTypedResourcePids()) {
 				TypedPidJson nextId = new TypedPidJson(typedResourcePid);
@@ -112,24 +117,24 @@ public class ResourceIdListStep<PT extends PartitionedJobParameters, IT extends 
 
 				totalIdsFound += submissionIds.size();
 				chunkCount++;
-				submitWorkChunk(submissionIds, theDataSink);
+				submitWorkChunk(submissionIds, nextChunk.getRequestPartitionId(), theDataSink);
 			}
 		}
 
 		totalIdsFound += idBuffer.size();
 		chunkCount++;
-		submitWorkChunk(idBuffer, theDataSink);
+		submitWorkChunk(idBuffer, requestPartitionId, theDataSink);
 
 		ourLog.info("Submitted {} chunks with {} resource IDs", chunkCount, totalIdsFound);
 		return RunOutcome.SUCCESS;
 	}
 
-	private void submitWorkChunk(Collection<TypedPidJson> theTypedPids, IJobDataSink<ResourceIdListWorkChunkJson> theDataSink) {
+	private void submitWorkChunk(Collection<TypedPidJson> theTypedPids, RequestPartitionId theRequestPartitionId, IJobDataSink<ResourceIdListWorkChunkJson> theDataSink) {
 		if (theTypedPids.isEmpty()) {
 			return;
 		}
 		ourLog.info("Submitting work chunk with {} IDs", theTypedPids.size());
-		ResourceIdListWorkChunkJson data = new ResourceIdListWorkChunkJson(theTypedPids);
+		ResourceIdListWorkChunkJson data = new ResourceIdListWorkChunkJson(theTypedPids, theRequestPartitionId);
 		ourLog.debug("IDs are: {}", data);
 		theDataSink.accept(data);
 	}

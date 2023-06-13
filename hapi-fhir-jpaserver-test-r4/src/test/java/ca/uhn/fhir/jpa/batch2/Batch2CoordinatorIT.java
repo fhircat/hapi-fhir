@@ -55,6 +55,7 @@ import static ca.uhn.fhir.batch2.coordinator.WorkChunkProcessor.MAX_CHUNK_ERROR_
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -88,10 +89,14 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 		return RunOutcome.SUCCESS;
 	}
 
+	@Override
 	@BeforeEach
-	public void before() {
+	public void before() throws Exception {
+		super.before();
+
 		myCompletionHandler = details -> {};
 		myWorkChannel = (LinkedBlockingChannel) myChannelFactory.getOrCreateReceiver(CHANNEL_NAME, JobWorkNotificationJsonMessage.class, new ChannelConsumerSettings());
+		myStorageSettings.setJobFastTrackingEnabled(true);
 	}
 
 	@AfterEach
@@ -105,13 +110,9 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 
 		// create a job
 		// step 1
-		IJobStepWorker<TestJobParameters, VoidModel, FirstStepOutput> first = (step, sink) -> {
-			return RunOutcome.SUCCESS;
-		};
+		IJobStepWorker<TestJobParameters, VoidModel, FirstStepOutput> first = (step, sink) -> RunOutcome.SUCCESS;
 		// final step
-		ILastJobStepWorker<TestJobParameters, FirstStepOutput> last = (step, sink) -> {
-			return RunOutcome.SUCCESS;
-		};
+		ILastJobStepWorker<TestJobParameters, FirstStepOutput> last = (step, sink) -> RunOutcome.SUCCESS;
 		// job definition
 		String jobId = new Exception().getStackTrace()[0].getMethodName();
 		JobDefinition<? extends IModelJson> jd = JobDefinition.newBuilder()
@@ -139,7 +140,7 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 		for (int i = 0; i < maxJobsToSave; i++) {
 			JobInstanceStartRequest request = buildRequest(jobId);
 			Batch2JobStartResponse response = myJobCoordinator.startInstance(request);
-			jobIds.add(response.getJobId());
+			jobIds.add(response.getInstanceId());
 		}
 
 		// run the test
@@ -150,6 +151,7 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 		request.setPageStart(index);
 		request.setBatchSize(size);
 		request.setSort(Sort.unsorted());
+		request.setJobStatus("");
 
 		Page<JobInstance> page;
 		Iterator<JobInstance> iterator;
@@ -189,7 +191,7 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 		Batch2JobStartResponse startResponse = myJobCoordinator.startInstance(request);
 		myFirstStepLatch.awaitExpected();
 
-		myBatch2JobHelper.awaitJobCompletion(startResponse.getJobId());
+		myBatch2JobHelper.awaitJobCompletion(startResponse.getInstanceId());
 	}
 
 	@Test
@@ -210,7 +212,7 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 
 		myFirstStepLatch.setExpectedCount(1);
 		myLastStepLatch.setExpectedCount(1);
-		String batchJobId = myJobCoordinator.startInstance(request).getJobId();
+		String batchJobId = myJobCoordinator.startInstance(request).getInstanceId();
 		myFirstStepLatch.awaitExpected();
 
 		myBatch2JobHelper.assertFastTracking(batchJobId);
@@ -218,6 +220,15 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 		// Since there was only one chunk, the job should proceed without requiring a maintenance pass
 		myBatch2JobHelper.awaitJobCompletion(batchJobId);
 		myLastStepLatch.awaitExpected();
+
+		final List<JobInstance> jobInstances = myJobPersistence.fetchInstances(10, 0);
+
+		assertEquals(1, jobInstances.size());
+
+		final JobInstance jobInstance = jobInstances.get(0);
+
+		assertEquals(StatusEnum.COMPLETED, jobInstance.getStatus());
+		assertEquals(1.0, jobInstance.getProgress());
 	}
 
 	private void createThreeStepReductionJob(
@@ -279,7 +290,7 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 		};
 
 		// step 3
-		IReductionStepWorker<TestJobParameters, SecondStepOutput, ReductionStepOutput> last = new IReductionStepWorker<TestJobParameters, SecondStepOutput, ReductionStepOutput>() {
+		IReductionStepWorker<TestJobParameters, SecondStepOutput, ReductionStepOutput> last = new IReductionStepWorker<>() {
 
 			private final ArrayList<SecondStepOutput> myOutput = new ArrayList<>();
 
@@ -287,6 +298,7 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 
 			private final AtomicInteger mySecondGate = new AtomicInteger();
 
+			@Nonnull
 			@Override
 			public ChunkOutcome consume(ChunkExecutionDetails<TestJobParameters, SecondStepOutput> theChunkDetails) {
 				myOutput.add(theChunkDetails.getData());
@@ -329,7 +341,7 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 		myFirstStepLatch.setExpectedCount(1);
 		Batch2JobStartResponse startResponse = myJobCoordinator.startInstance(request);
 
-		String instanceId = startResponse.getJobId();
+		String instanceId = startResponse.getInstanceId();
 		myFirstStepLatch.awaitExpected();
 		assertNotNull(instanceId);
 
@@ -358,6 +370,15 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 				testInfo + i
 			));
 		}
+
+		final List<JobInstance> jobInstances = myJobPersistence.fetchInstances(10, 0);
+
+		assertEquals(1, jobInstances.size());
+
+		final JobInstance jobInstance = jobInstances.get(0);
+
+		assertEquals(StatusEnum.COMPLETED, jobInstance.getStatus());
+		assertEquals(1.0, jobInstance.getProgress());
 	}
 
 	@Test
@@ -378,7 +399,7 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 
 		myFirstStepLatch.setExpectedCount(1);
 		Batch2JobStartResponse startResponse = myJobCoordinator.startInstance(request);
-		String instanceId = startResponse.getJobId();
+		String instanceId = startResponse.getInstanceId();
 		myFirstStepLatch.awaitExpected();
 
 		myLastStepLatch.setExpectedCount(2);
@@ -407,7 +428,7 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 
 		// execute
 		Batch2JobStartResponse startResponse = myJobCoordinator.startInstance(request);
-		String instanceId = startResponse.getJobId();
+		String instanceId = startResponse.getInstanceId();
 
 		// validate
 		myBatch2JobHelper.awaitJobFailure(instanceId);
@@ -430,16 +451,19 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 		JobInstanceStartRequest request = buildRequest(jobDefId);
 
 		// execute
+		ourLog.info("Starting job");
 		myFirstStepLatch.setExpectedCount(1);
 		Batch2JobStartResponse startResponse = myJobCoordinator.startInstance(request);
-		String instanceId = startResponse.getJobId();
+		String instanceId = startResponse.getInstanceId();
 		myFirstStepLatch.awaitExpected();
 
 		// validate
 		myBatch2JobHelper.awaitJobInProgress(instanceId);
 
 		// execute
+		ourLog.info("Cancel job {}", instanceId);
 		myJobCoordinator.cancelInstance(instanceId);
+		ourLog.info("Cancel job {} done", instanceId);
 
 		// validate
 		myBatch2JobHelper.awaitJobCancelled(instanceId);
@@ -485,14 +509,14 @@ public class Batch2CoordinatorIT extends BaseJpaR4Test {
 		JobInstanceStartRequest request = buildRequest(jobDefId);
 		myFirstStepLatch.setExpectedCount(1);
 		Batch2JobStartResponse response = myJobCoordinator.startInstance(request);
-		JobInstance instance = myBatch2JobHelper.awaitJobHasStatus(response.getJobId(),
-			12, // we want to wait a long time (2 min here) cause backoff is incremental
+		JobInstance instance = myBatch2JobHelper.awaitJobHasStatus(response.getInstanceId(),
+			30, // we want to wait a long time (2 min here) cause backoff is incremental
 			StatusEnum.FAILED
 		);
 
 		assertEquals(MAX_CHUNK_ERROR_COUNT + 1, counter.get());
 
-		assertTrue(instance.getStatus() == StatusEnum.FAILED);
+		assertSame(StatusEnum.FAILED, instance.getStatus());
 	}
 
 	@Nonnull

@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.api.pid;
-
 /*-
  * #%L
  * HAPI FHIR Storage api
@@ -19,7 +17,9 @@ package ca.uhn.fhir.jpa.api.pid;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.api.pid;
 
+import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.rest.api.server.storage.IResourcePersistentId;
 
 import javax.annotation.Nonnull;
@@ -30,6 +30,8 @@ import java.util.List;
  * List of IResourcePersistentId along with a resource type each id
  */
 public interface IResourcePidList {
+
+	RequestPartitionId getRequestPartitionId();
 
 	Date getLastDate();
 

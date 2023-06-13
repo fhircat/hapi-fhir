@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.model.entity;
-
 /*
  * #%L
  * HAPI FHIR JPA Model
@@ -19,7 +17,9 @@ package ca.uhn.fhir.jpa.model.entity;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.model.entity;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -38,7 +38,6 @@ import javax.persistence.OneToMany;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
 import javax.persistence.Transient;
-import javax.persistence.UniqueConstraint;
 import java.io.Serializable;
 import java.util.Collection;
 
@@ -46,10 +45,7 @@ import java.util.Collection;
 @Table(
 	name = "HFJ_TAG_DEF",
 	indexes = {
-		@Index(name = "IDX_TAG_DEF_TP_CD_SYS", columnList = "TAG_TYPE, TAG_CODE, TAG_SYSTEM, TAG_ID"),
-	},
-	uniqueConstraints = {
-		@UniqueConstraint(name = "IDX_TAGDEF_TYPESYSCODE", columnNames = {"TAG_TYPE", "TAG_SYSTEM", "TAG_CODE"})
+		@Index(name = "IDX_TAG_DEF_TP_CD_SYS", columnList = "TAG_TYPE, TAG_CODE, TAG_SYSTEM, TAG_ID, TAG_VERSION, TAG_USER_SELECTED"),
 	}
 )
 public class TagDefinition implements Serializable {
@@ -57,22 +53,35 @@ public class TagDefinition implements Serializable {
 	private static final long serialVersionUID = 1L;
 	@Column(name = "TAG_CODE", length = 200)
 	private String myCode;
+
 	@Column(name = "TAG_DISPLAY", length = 200)
 	private String myDisplay;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.AUTO, generator = "SEQ_TAGDEF_ID")
 	@SequenceGenerator(name = "SEQ_TAGDEF_ID", sequenceName = "SEQ_TAGDEF_ID")
 	@Column(name = "TAG_ID")
 	private Long myId;
+
 	@OneToMany(cascade = {}, fetch = FetchType.LAZY, mappedBy = "myTag")
 	private Collection<ResourceTag> myResources;
+
 	@OneToMany(cascade = {}, fetch = FetchType.LAZY, mappedBy = "myTag")
 	private Collection<ResourceHistoryTag> myResourceVersions;
+
 	@Column(name = "TAG_SYSTEM", length = 200)
 	private String mySystem;
+
 	@Column(name = "TAG_TYPE", nullable = false)
 	@Enumerated(EnumType.ORDINAL)
 	private TagTypeEnum myTagType;
+
+	@Column(name = "TAG_VERSION", length = 30)
+	private String myVersion;
+
+	@Column(name = "TAG_USER_SELECTED")
+	private Boolean myUserSelected;
+
 	@Transient
 	private transient Integer myHashCode;
 
@@ -133,6 +142,33 @@ public class TagDefinition implements Serializable {
 		myHashCode = null;
 	}
 
+	public String getVersion() {
+		return myVersion;
+	}
+
+	public void setVersion(String theVersion) {
+		setVersionAfterTrim(theVersion);
+	}
+
+	private void setVersionAfterTrim(String theVersion) {
+		if (theVersion != null) {
+			myVersion = StringUtils.truncate(theVersion, 30);
+		}
+	}
+
+	/**
+	 * Warning - this is nullable, while IBaseCoding getUserSelected isn't.
+	 * todo maybe rename?
+	 */
+	public Boolean getUserSelected() {
+		return myUserSelected;
+	}
+
+	public void setUserSelected(Boolean theUserSelected) {
+		myUserSelected = theUserSelected;
+	}
+
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj) {
@@ -151,6 +187,8 @@ public class TagDefinition implements Serializable {
 			b.append(myTagType, other.myTagType);
 			b.append(mySystem, other.mySystem);
 			b.append(myCode, other.myCode);
+			b.append(myVersion, other.myVersion);
+			b.append(myUserSelected, other.myUserSelected);
 		}
 
 		return b.isEquals();
@@ -163,6 +201,8 @@ public class TagDefinition implements Serializable {
 			b.append(myTagType);
 			b.append(mySystem);
 			b.append(myCode);
+			b.append(myVersion);
+			b.append(myUserSelected);
 			myHashCode = b.toHashCode();
 		}
 		return myHashCode;
@@ -175,6 +215,8 @@ public class TagDefinition implements Serializable {
 		retVal.append("system", mySystem);
 		retVal.append("code", myCode);
 		retVal.append("display", myDisplay);
+		retVal.append("version", myVersion);
+		retVal.append("userSelected", myUserSelected);
 		return retVal.build();
 	}
 }

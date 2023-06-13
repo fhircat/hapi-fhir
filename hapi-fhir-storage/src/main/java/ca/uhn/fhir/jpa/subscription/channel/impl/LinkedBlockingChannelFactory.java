@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.subscription.channel.impl;
-
 /*-
  * #%L
  * HAPI FHIR Storage api
@@ -19,6 +17,7 @@ package ca.uhn.fhir.jpa.subscription.channel.impl;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.subscription.channel.impl;
 
 import ca.uhn.fhir.jpa.subscription.channel.api.ChannelConsumerSettings;
 import ca.uhn.fhir.jpa.subscription.channel.api.ChannelProducerSettings;
@@ -27,7 +26,7 @@ import ca.uhn.fhir.jpa.subscription.channel.api.IChannelProducer;
 import ca.uhn.fhir.jpa.subscription.channel.api.IChannelReceiver;
 import ca.uhn.fhir.jpa.subscription.channel.api.IChannelSettings;
 import ca.uhn.fhir.jpa.subscription.channel.subscription.IChannelNamer;
-import ca.uhn.fhir.jpa.subscription.match.registry.SubscriptionConstants;
+import ca.uhn.fhir.subscription.SubscriptionConstants;
 import ca.uhn.fhir.util.ThreadPoolUtil;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 

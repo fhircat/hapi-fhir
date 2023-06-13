@@ -1,5 +1,3 @@
-package ca.uhn.fhir.mdm.batch2.clear;
-
 /*-
  * #%L
  * hapi-fhir-storage-mdm
@@ -19,10 +17,12 @@ package ca.uhn.fhir.mdm.batch2.clear;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.mdm.batch2.clear;
 
 import ca.uhn.fhir.batch2.api.IJobParametersValidator;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.mdm.api.IMdmSettings;
+import ca.uhn.fhir.rest.api.server.RequestDetails;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -42,7 +42,7 @@ public class MdmClearJobParametersValidator implements IJobParametersValidator<M
 
 	@Nullable
 	@Override
-	public List<String> validate(@Nonnull MdmClearJobParameters theParameters) {
+	public List<String> validate(RequestDetails theRequestDetails, @Nonnull MdmClearJobParameters theParameters) {
 		if (myMdmSettings == null || !myMdmSettings.isEnabled()) {
 			return Collections.singletonList("Mdm is not enabled on this server");
 		}

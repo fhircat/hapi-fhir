@@ -1,5 +1,3 @@
-package ca.uhn.fhir.validation.schematron;
-
 /*
  * #%L
  * HAPI FHIR - Core Library
@@ -19,6 +17,7 @@ package ca.uhn.fhir.validation.schematron;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.validation.schematron;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.i18n.Msg;
@@ -34,6 +33,8 @@ import ca.uhn.fhir.validation.SingleValidationMessage;
 import ca.uhn.fhir.validation.ValidationContext;
 import com.helger.commons.error.IError;
 import com.helger.commons.error.list.IErrorList;
+import com.helger.commons.io.resource.ClassPathResource;
+import com.helger.commons.io.resource.IReadableResource;
 import com.helger.schematron.ISchematronResource;
 import com.helger.schematron.SchematronHelper;
 import com.helger.schematron.svrl.jaxb.SchematronOutputType;
@@ -150,7 +151,11 @@ public class SchematronBaseValidator implements IValidatorModule {
 				ourLog.error("Failed to close stream", e);
 			}
 
-			retVal = SchematronResourceSCH.fromClassPath(pathToBase);
+			// Allow Schematron to load SCH files from the 'validation-resources' 
+			// bundles when running in an OSGi container. This is because the 
+			// Schematron bundle does not have DynamicImport-Package in its manifest.
+            IReadableResource schResource = new ClassPathResource(pathToBase, this.getClass().getClassLoader());
+            retVal = new SchematronResourceSCH(schResource);
 			myClassToSchematron.put(theClass, retVal);
 			return retVal;
 		}

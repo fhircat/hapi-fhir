@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.migrate;
-
 /*-
  * #%L
  * HAPI FHIR Server - SQL Migration
@@ -19,6 +17,7 @@ package ca.uhn.fhir.jpa.migrate;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.migrate;
 
 import ca.uhn.fhir.i18n.Msg;
 import ca.uhn.fhir.jpa.migrate.dao.HapiMigrationDao;
@@ -89,8 +88,8 @@ public class HapiMigrationStorageSvc {
 	 * Create the migration table if it does not already exist
 	 */
 
-	public void createMigrationTableIfRequired() {
-		myHapiMigrationDao.createMigrationTableIfRequired();
+	public boolean createMigrationTableIfRequired() {
+		return myHapiMigrationDao.createMigrationTableIfRequired();
 	}
 
 

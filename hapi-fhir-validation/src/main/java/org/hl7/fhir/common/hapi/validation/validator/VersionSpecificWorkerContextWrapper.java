@@ -26,7 +26,10 @@ import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ValueSet;
-import org.hl7.fhir.r5.terminologies.ValueSetExpander;
+import org.hl7.fhir.r5.profilemodel.PEBuilder;
+
+import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.r5.terminologies.utilities.TerminologyServiceErrorClass;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.ValidationContextCarrier;
 import org.hl7.fhir.utilities.TimeTracker;
@@ -41,6 +44,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -121,7 +126,7 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 	}
 
 	@Override
-	public int loadFromPackage(NpmPackage pi, IContextResourceLoader loader, String[] types) throws FHIRException {
+	public int loadFromPackage(NpmPackage pi, IContextResourceLoader loader, List<String> types) throws FileNotFoundException, IOException, FHIRException {
 		throw new UnsupportedOperationException(Msg.code(653));
 	}
 
@@ -173,9 +178,12 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 
 	@Override
 	public String getSpecUrl() {
-
 			return "";
+	}
 
+	@Override
+	public PEBuilder getProfiledElementBuilder(PEBuilder.PEElementPropertiesPolicy thePEElementPropertiesPolicy, boolean theB) {
+		throw new UnsupportedOperationException(Msg.code(2264));
 	}
 
 	@Override
@@ -233,27 +241,29 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 		if (theResult != null) {
 			String code = theResult.getCode();
 			String display = theResult.getDisplay();
+		
 			String issueSeverity = theResult.getSeverityCode();
 			String message = theResult.getMessage();
 			if (isNotBlank(code)) {
-				retVal = new ValidationResult(theSystem, new org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent()
+				retVal = new ValidationResult(theSystem, null, new org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent()
 					.setCode(code)
-					.setDisplay(display));
+					.setDisplay(display),
+					null);
 			} else if (isNotBlank(issueSeverity)) {
-				retVal = new ValidationResult(ValidationMessage.IssueSeverity.fromCode(issueSeverity), message, ValueSetExpander.TerminologyServiceErrorClass.UNKNOWN);
+				retVal = new ValidationResult(ValidationMessage.IssueSeverity.fromCode(issueSeverity), message, TerminologyServiceErrorClass.UNKNOWN, null);
 			}
 
 		}
 
 		if (retVal == null) {
-			retVal = new ValidationResult(ValidationMessage.IssueSeverity.ERROR, "Validation failed");
+			retVal = new ValidationResult(ValidationMessage.IssueSeverity.ERROR, "Validation failed", null);
 		}
 
 		return retVal;
 	}
 
 	@Override
-	public ValueSetExpander.ValueSetExpansionOutcome expandVS(org.hl7.fhir.r5.model.ValueSet source, boolean cacheOk, boolean Hierarchical) {
+	public ValueSetExpansionOutcome expandVS(org.hl7.fhir.r5.model.ValueSet source, boolean cacheOk, boolean Hierarchical) {
 		IBaseResource convertedSource;
 		try {
 			convertedSource = myVersionCanonicalizer.valueSetFromValidatorCanonical(source);
@@ -272,18 +282,18 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 		}
 
 		String error = expanded.getError();
-		ValueSetExpander.TerminologyServiceErrorClass result = null;
+		TerminologyServiceErrorClass result = null;
 
-		return new ValueSetExpander.ValueSetExpansionOutcome(convertedResult, error, result);
+		return new ValueSetExpansionOutcome(convertedResult, error, result);
 	}
 
 	@Override
-	public ValueSetExpander.ValueSetExpansionOutcome expandVS(Resource src, org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent binding, boolean cacheOk, boolean Hierarchical) {
+	public ValueSetExpansionOutcome expandVS(Resource src, org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent binding, boolean cacheOk, boolean Hierarchical) {
 		throw new UnsupportedOperationException(Msg.code(663));
 	}
 
 	@Override
-	public ValueSetExpander.ValueSetExpansionOutcome expandVS(ValueSet.ConceptSetComponent inc, boolean hierarchical, boolean noInactive) throws TerminologyServiceException {
+	public ValueSetExpansionOutcome expandVS(ValueSet.ConceptSetComponent inc, boolean hierarchical, boolean noInactive) throws TerminologyServiceException {
 		throw new UnsupportedOperationException(Msg.code(664));
 	}
 
@@ -324,6 +334,16 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 	}
 
 	@Override
+	public CodeSystem fetchSupplementedCodeSystem(String system) {
+		return null;
+	}
+
+	@Override
+	public CodeSystem fetchSupplementedCodeSystem(String system, String version) {
+		return null;
+	}
+
+	@Override
 	public <T extends Resource> T fetchResource(Class<T> class_, String uri) {
 
 		if (isBlank(uri)) {
@@ -361,6 +381,7 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 		return fetchResource(class_, uri);
 	}
 
+	@Override
 	public <T extends Resource> T fetchResourceWithException(Class<T> class_, String uri, Resource sourceOfReference) throws FHIRException {
 		throw new UnsupportedOperationException(Msg.code(2214));
 	}
@@ -378,6 +399,11 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 	@Override
 	public StructureDefinition fetchTypeDefinition(String typeName) {
 		return fetchResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/" + typeName);
+	}
+
+	@Override
+	public List<StructureDefinition> fetchTypeDefinitions(String n) {
+		throw new UnsupportedOperationException(Msg.code(2329));
 	}
 
 	@Override
@@ -441,7 +467,7 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 	}
 
 	@Override
-	public ValueSetExpander.ValueSetExpansionOutcome expandVS(ValueSet source, boolean cacheOk, boolean heiarchical, boolean incompleteOk) {
+	public ValueSetExpansionOutcome expandVS(ValueSet source, boolean cacheOk, boolean heiarchical, boolean incompleteOk) {
 		return null;
 	}
 
@@ -546,7 +572,7 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 			return validationResultsOk.get(0);
 		}
 
-		return new ValidationResult(ValidationMessage.IssueSeverity.ERROR, null);
+		return new ValidationResult(ValidationMessage.IssueSeverity.ERROR, null, null);
 	}
 
 	public void invalidateCaches() {
@@ -619,6 +645,17 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 	public static VersionSpecificWorkerContextWrapper newVersionSpecificWorkerContextWrapper(IValidationSupport theValidationSupport) {
 		VersionCanonicalizer versionCanonicalizer = new VersionCanonicalizer(theValidationSupport.getFhirContext());
 		return new VersionSpecificWorkerContextWrapper(new ValidationSupportContext(theValidationSupport), versionCanonicalizer);
+	}
+
+	@Override
+	public boolean isForPublication() {
+		return false;
+	}
+
+	@Override
+	public void setForPublication(boolean b) {
+		throw new UnsupportedOperationException(Msg.code(2351));
+
 	}
 }
 

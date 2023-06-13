@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.bulk.export.svc;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server
@@ -19,14 +17,12 @@ package ca.uhn.fhir.jpa.bulk.export.svc;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.bulk.export.svc;
 
 import ca.uhn.fhir.batch2.api.IJobPersistence;
-import ca.uhn.fhir.batch2.jobs.export.BulkExportAppCtx;
-import ca.uhn.fhir.batch2.jobs.export.models.BulkExportBinaryFileId;
 import ca.uhn.fhir.batch2.model.JobInstance;
 import ca.uhn.fhir.batch2.model.StatusEnum;
-import ca.uhn.fhir.batch2.model.WorkChunk;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.api.model.BulkExportJobResults;
@@ -71,14 +67,12 @@ public class BulkDataExportJobSchedulingHelperImpl implements IBulkDataExportJob
 	private final DaoRegistry myDaoRegistry;
 
 	private final PlatformTransactionManager myTxManager;
+	private final JpaStorageSettings myDaoConfig;
+	private final BulkExportHelperService myBulkExportHelperSvc;
+	private final IJobPersistence myJpaJobPersistence;
 	private TransactionTemplate myTxTemplate;
 
-	private final DaoConfig myDaoConfig;
-	private final BulkExportHelperService myBulkExportHelperSvc;
-
-	private final IJobPersistence myJpaJobPersistence;
-
-	public BulkDataExportJobSchedulingHelperImpl(DaoRegistry theDaoRegistry, PlatformTransactionManager theTxManager, DaoConfig theDaoConfig, BulkExportHelperService theBulkExportHelperSvc, IJobPersistence theJpaJobPersistence, TransactionTemplate theTxTemplate) {
+	public BulkDataExportJobSchedulingHelperImpl(DaoRegistry theDaoRegistry, PlatformTransactionManager theTxManager, JpaStorageSettings theDaoConfig, BulkExportHelperService theBulkExportHelperSvc, IJobPersistence theJpaJobPersistence, TransactionTemplate theTxTemplate) {
 		myDaoRegistry = theDaoRegistry;
 		myTxManager = theTxManager;
 		myDaoConfig = theDaoConfig;

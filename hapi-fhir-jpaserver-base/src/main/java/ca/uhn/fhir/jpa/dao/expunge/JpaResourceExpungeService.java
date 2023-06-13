@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.dao.expunge;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server
@@ -19,11 +17,12 @@ package ca.uhn.fhir.jpa.dao.expunge;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.dao.expunge;
 
 import ca.uhn.fhir.interceptor.api.HookParams;
 import ca.uhn.fhir.interceptor.api.IInterceptorBroadcaster;
 import ca.uhn.fhir.interceptor.api.Pointcut;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.svc.IIdHelperService;
 import ca.uhn.fhir.jpa.dao.IJpaStorageResourceParser;
@@ -120,7 +119,7 @@ public class JpaResourceExpungeService implements IResourceExpungeService<JpaPid
 	@Autowired
 	private ISearchParamPresentDao mySearchParamPresentDao;
 	@Autowired
-	private DaoConfig myDaoConfig;
+	private JpaStorageSettings myStorageSettings;
 	@Autowired
 	private MemoryCacheService myMemoryCacheService;
 	@Autowired
@@ -237,8 +236,11 @@ public class JpaResourceExpungeService implements IResourceExpungeService<JpaPid
 	@Override
 	@Transactional
 	public void expungeHistoricalVersionsOfIds(RequestDetails theRequestDetails, List<JpaPid> theResourceIds, AtomicInteger theRemainingCount) {
-		for (JpaPid next : theResourceIds) {
-			expungeHistoricalVersionsOfId(theRequestDetails, (next).getId(), theRemainingCount);
+		List<Long> pids = JpaPid.toLongList(theResourceIds);
+
+		List<ResourceTable> resourcesToDelete = myResourceTableDao.findAllByIdAndLoadForcedIds(pids);
+		for (ResourceTable next : resourcesToDelete) {
+			expungeHistoricalVersionsOfId(theRequestDetails, next, theRemainingCount);
 			if (expungeLimitReached(theRemainingCount)) {
 				return;
 			}
@@ -268,12 +270,12 @@ public class JpaResourceExpungeService implements IResourceExpungeService<JpaPid
 
 		deleteAllSearchParams(JpaPid.fromId(resource.getResourceId()));
 
-		myResourceTagDao.deleteByResourceId(resource.getId());
+		if (resource.isHasTags()) {
+			myResourceTagDao.deleteByResourceId(resource.getId());
+		}
 
 		if (resource.getForcedId() != null) {
 			ForcedId forcedId = resource.getForcedId();
-			resource.setForcedId(null);
-			myResourceTableDao.saveAndFlush(resource);
 			myForcedIdDao.deleteByPid(forcedId.getId());
 		}
 
@@ -316,7 +318,7 @@ public class JpaResourceExpungeService implements IResourceExpungeService<JpaPid
 		if (resource == null || resource.isParamsComboTokensNonUniquePresent()) {
 			myResourceIndexedComboTokensNonUniqueDao.deleteByResourceId(theResourceLongId);
 		}
-		if (myDaoConfig.getIndexMissingFields() == DaoConfig.IndexEnabledEnum.ENABLED) {
+		if (myStorageSettings.getIndexMissingFields() == JpaStorageSettings.IndexEnabledEnum.ENABLED) {
 			mySearchParamPresentDao.deleteByResourceId(theResourceLongId);
 		}
 		if (resource == null || resource.isHasLinks()) {
@@ -324,7 +326,7 @@ public class JpaResourceExpungeService implements IResourceExpungeService<JpaPid
 		}
 	}
 
-	private void expungeHistoricalVersionsOfId(RequestDetails theRequestDetails, Long myResourceId, AtomicInteger theRemainingCount) {
+	private void expungeHistoricalVersionsOfId(RequestDetails theRequestDetails, ResourceTable theResource, AtomicInteger theRemainingCount) {
 		Pageable page;
 		synchronized (theRemainingCount) {
 			if (expungeLimitReached(theRemainingCount)) {
@@ -333,10 +335,8 @@ public class JpaResourceExpungeService implements IResourceExpungeService<JpaPid
 			page = PageRequest.of(0, theRemainingCount.get());
 		}
 
-		ResourceTable resource = myResourceTableDao.findById(myResourceId).orElseThrow(IllegalArgumentException::new);
-
-		Slice<Long> versionIds = myResourceHistoryTableDao.findForResourceId(page, resource.getId(), resource.getVersion());
-		ourLog.debug("Found {} versions of resource {} to expunge", versionIds.getNumberOfElements(), resource.getIdDt().getValue());
+		Slice<Long> versionIds = myResourceHistoryTableDao.findForResourceId(page, theResource.getId(), theResource.getVersion());
+		ourLog.debug("Found {} versions of resource {} to expunge", versionIds.getNumberOfElements(), theResource.getIdDt().getValue());
 		for (Long nextVersionId : versionIds) {
 			expungeHistoricalVersion(theRequestDetails, nextVersionId, theRemainingCount);
 			if (expungeLimitReached(theRemainingCount)) {

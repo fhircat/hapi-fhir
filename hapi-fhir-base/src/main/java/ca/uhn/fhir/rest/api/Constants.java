@@ -1,5 +1,3 @@
-package ca.uhn.fhir.rest.api;
-
 /*
  * #%L
  * HAPI FHIR - Core Library
@@ -19,6 +17,7 @@ package ca.uhn.fhir.rest.api;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.rest.api;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -264,7 +263,9 @@ public class Constants {
 	public static final String PARAM_SEARCH_TOTAL_MODE = "_total";
 	public static final String CAPABILITYSTATEMENT_WEBSOCKET_URL = "http://hl7.org/fhir/StructureDefinition/capabilitystatement-websocket";
 	public static final String PARAMETER_CASCADE_DELETE = "_cascade";
+	public static final String PARAMETER_CASCADE_DELETE_MAX_ROUNDS = "_maxRounds";
 	public static final String HEADER_CASCADE = "X-Cascade";
+	public static final String HEADER_CASCADE_MAX_ROUNDS = "max-rounds";
 	public static final String CASCADE_DELETE = "delete";
 	public static final int MAX_RESOURCE_NAME_LENGTH = 100;
 	public static final String CACHE_CONTROL_PRIVATE = "private";
@@ -307,8 +308,17 @@ public class Constants {
 	public static final String PARAMQUALIFIER_TOKEN_NOT_IN = ":not-in";
 	public static final String PARAMQUALIFIER_TOKEN_ABOVE = ":above";
 	public static final String PARAMQUALIFIER_TOKEN_BELOW = ":below";
+	/**
+	 * The number of characters in a UUID (36)
+ 	 */
+	public static final int UUID_LENGTH = 36;
 
-	static {
+	/**
+	 * Application configuration key used to enable or disable Hibernate Envers.
+	 */
+	public static final String HIBERNATE_INTEGRATION_ENVERS_ENABLED = "hibernate.integration.envers.enabled";
+
+    static {
 		CHARSET_UTF8 = StandardCharsets.UTF_8;
 		CHARSET_US_ASCII = StandardCharsets.ISO_8859_1;
 

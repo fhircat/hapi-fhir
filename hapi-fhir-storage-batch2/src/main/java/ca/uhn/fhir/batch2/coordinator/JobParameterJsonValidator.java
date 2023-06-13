@@ -1,5 +1,3 @@
-package ca.uhn.fhir.batch2.coordinator;
-
 /*-
  * #%L
  * HAPI FHIR JPA Server - Batch2 Task Processor
@@ -19,12 +17,14 @@ package ca.uhn.fhir.batch2.coordinator;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.batch2.coordinator;
 
 import ca.uhn.fhir.batch2.api.IJobParametersValidator;
 import ca.uhn.fhir.batch2.model.JobDefinition;
 import ca.uhn.fhir.batch2.model.JobInstanceStartRequest;
 import ca.uhn.fhir.i18n.Msg;
 import ca.uhn.fhir.model.api.IModelJson;
+import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 
 import javax.annotation.Nonnull;
@@ -42,7 +42,7 @@ import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 class JobParameterJsonValidator {
 	private final ValidatorFactory myValidatorFactory = Validation.buildDefaultValidatorFactory();
 
-	<PT extends IModelJson> void validateJobParameters(@Nonnull JobInstanceStartRequest theStartRequest, @Nonnull JobDefinition<PT> theJobDefinition) {
+	<PT extends IModelJson> void validateJobParameters(RequestDetails theRequestDetails, @Nonnull JobInstanceStartRequest theStartRequest, @Nonnull JobDefinition<PT> theJobDefinition) {
 
 		// JSR 380
 		Validator validator = myValidatorFactory.getValidator();
@@ -53,7 +53,7 @@ class JobParameterJsonValidator {
 		// Programmatic Validator
 		IJobParametersValidator<PT> parametersValidator = theJobDefinition.getParametersValidator();
 		if (parametersValidator != null) {
-			List<String> outcome = parametersValidator.validate(parameters);
+			List<String> outcome = parametersValidator.validate(theRequestDetails, parameters);
 			outcome = defaultIfNull(outcome, Collections.emptyList());
 			errorStrings.addAll(outcome);
 		}

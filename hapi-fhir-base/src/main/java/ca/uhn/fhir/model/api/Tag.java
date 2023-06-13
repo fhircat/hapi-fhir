@@ -1,5 +1,3 @@
-package ca.uhn.fhir.model.api;
-
 /*
  * #%L
  * HAPI FHIR - Core Library
@@ -19,14 +17,15 @@ package ca.uhn.fhir.model.api;
  * limitations under the License.
  * #L%
  */
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
-
-import java.net.URI;
+package ca.uhn.fhir.model.api;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.hl7.fhir.instance.model.api.IBaseCoding;
+
+import java.net.URI;
+import java.util.Objects;
 
 /**
  * A single tag
@@ -59,6 +58,8 @@ public class Tag extends BaseElement implements IElement, IBaseCoding {
 	private String myLabel;
 	private String myScheme;
 	private String myTerm;
+	private String myVersion;
+	private Boolean myUserSelected;
 
 	public Tag() {
 	}
@@ -114,25 +115,22 @@ public class Tag extends BaseElement implements IElement, IBaseCoding {
 		if (getClass() != obj.getClass())
 			return false;
 		Tag other = (Tag) obj;
-		if (myScheme == null) {
-			if (other.myScheme != null)
-				return false;
-		} else if (!myScheme.equals(other.myScheme))
-			return false;
-		if (myTerm == null) {
-			if (other.myTerm != null)
-				return false;
-		} else if (!myTerm.equals(other.myTerm))
-			return false;
-		return true;
+
+		return
+			Objects.equals(myScheme, other.myScheme) &&
+			Objects.equals(myTerm, other.myTerm) &&
+			Objects.equals(myVersion, other.myVersion) &&
+			Objects.equals(myUserSelected, other.myUserSelected);
 	}
 
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((myScheme == null) ? 0 : myScheme.hashCode());
-		result = prime * result + ((myTerm == null) ? 0 : myTerm.hashCode());
+		result = prime * result + Objects.hashCode(myScheme);
+		result = prime * result + Objects.hashCode(myTerm);
+		result = prime * result + Objects.hashCode(myVersion);
+		result = prime * result + Objects.hashCode(myUserSelected);
 		return result;
 	}
 
@@ -174,6 +172,8 @@ public class Tag extends BaseElement implements IElement, IBaseCoding {
 		b.append("Scheme", myScheme);
 		b.append("Term", myTerm);
 		b.append("Label", myLabel);
+		b.append("Version", myVersion);
+		b.append("UserSelected", myUserSelected);
 		return b.toString();
 	}
 
@@ -208,6 +208,30 @@ public class Tag extends BaseElement implements IElement, IBaseCoding {
 	public IBaseCoding setSystem(String theScheme) {
 		setScheme(theScheme);
 		return this;
+	}
+
+	@Override
+	public String getVersion() { return myVersion; }
+
+	@Override
+	public IBaseCoding setVersion(String theVersion) {
+		myVersion = theVersion;
+		return this;
+	}
+
+	@Override
+	public boolean getUserSelected() { return myUserSelected != null && myUserSelected; }
+
+	public Boolean getUserSelectedBoolean() { return myUserSelected; }
+
+	@Override
+	public IBaseCoding setUserSelected(boolean theUserSelected) {
+		myUserSelected = theUserSelected;
+		return this;
+	}
+
+	public void setUserSelectedBoolean(Boolean theUserSelected) {
+		myUserSelected = theUserSelected;
 	}
 
 }

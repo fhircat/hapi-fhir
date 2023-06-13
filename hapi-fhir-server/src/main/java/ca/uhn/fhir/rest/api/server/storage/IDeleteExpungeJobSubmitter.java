@@ -1,5 +1,3 @@
-package ca.uhn.fhir.rest.api.server.storage;
-
 /*-
  * #%L
  * HAPI FHIR - Server Framework
@@ -19,6 +17,7 @@ package ca.uhn.fhir.rest.api.server.storage;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.rest.api.server.storage;
 
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 
@@ -31,5 +30,5 @@ public interface IDeleteExpungeJobSubmitter {
 	 * @param theUrlsToProcess A list of strings of the form "/Patient?active=true"
 	 * @return The Batch2 JobId that was started to run this batch job
 	 */
-	String submitJob(Integer theBatchSize, List<String> theUrlsToProcess, RequestDetails theRequest);
+	String submitJob(Integer theBatchSize, List<String> theUrlsToProcess, boolean theCascade, Integer theCascadeMaxRounds, RequestDetails theRequest);
 }

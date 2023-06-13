@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.api.pid;
-
 /*-
  * #%L
  * HAPI FHIR Storage api
@@ -19,16 +17,14 @@ package ca.uhn.fhir.jpa.api.pid;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.api.pid;
 
+import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.rest.api.server.storage.IResourcePersistentId;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 abstract public class BaseResourcePidList implements IResourcePidList {
 
@@ -36,10 +32,17 @@ abstract public class BaseResourcePidList implements IResourcePidList {
 
 	@Nullable
 	final Date myLastDate;
+	private final RequestPartitionId myRequestPartitionId;
 
-	BaseResourcePidList(Collection<IResourcePersistentId> theIds, Date theLastDate) {
+	BaseResourcePidList(Collection<IResourcePersistentId> theIds, Date theLastDate, RequestPartitionId theRequestPartitionId) {
 		myIds.addAll(theIds);
 		myLastDate = theLastDate;
+		myRequestPartitionId = theRequestPartitionId;
+	}
+
+	@Override
+	public RequestPartitionId getRequestPartitionId() {
+		return myRequestPartitionId;
 	}
 
 	@Override
@@ -74,6 +77,11 @@ abstract public class BaseResourcePidList implements IResourcePidList {
 
 	public IResourcePersistentId getId(int theIndex) {
 		return myIds.get(theIndex);
+	}
+
+	@Override
+	public String toString() {
+		return myIds.toString();
 	}
 }
 

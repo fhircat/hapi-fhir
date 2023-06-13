@@ -1,5 +1,3 @@
-package ca.uhn.fhir.jpa.subscription.match.registry;
-
 /*-
  * #%L
  * HAPI FHIR Storage api
@@ -19,6 +17,7 @@ package ca.uhn.fhir.jpa.subscription.match.registry;
  * limitations under the License.
  * #L%
  */
+package ca.uhn.fhir.jpa.subscription.match.registry;
 
 import ca.uhn.fhir.context.ConfigurationException;
 import ca.uhn.fhir.context.FhirContext;
@@ -27,6 +26,8 @@ import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.jpa.subscription.match.matcher.matching.SubscriptionMatchingStrategy;
 import ca.uhn.fhir.jpa.subscription.model.CanonicalSubscription;
 import ca.uhn.fhir.jpa.subscription.model.CanonicalSubscriptionChannelType;
+import ca.uhn.fhir.jpa.subscription.model.CanonicalTopicSubscription;
+import ca.uhn.fhir.jpa.subscription.model.CanonicalTopicSubscriptionFilter;
 import ca.uhn.fhir.model.api.BasePrimitive;
 import ca.uhn.fhir.model.api.ExtensionDt;
 import ca.uhn.fhir.model.dstu2.resource.Subscription;
@@ -34,6 +35,7 @@ import ca.uhn.fhir.model.primitive.BooleanDt;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.exceptions.PreconditionFailedException;
+import ca.uhn.fhir.subscription.SubscriptionConstants;
 import ca.uhn.fhir.util.HapiExtensions;
 import ca.uhn.fhir.util.SubscriptionUtil;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -79,6 +81,8 @@ public class SubscriptionCanonicalizer {
 				return canonicalizeDstu3(theSubscription);
 			case R4:
 				return canonicalizeR4(theSubscription);
+			case R4B:
+				return canonicalizeR4B(theSubscription);
 			case R5:
 				return canonicalizeR5(theSubscription);
 			case DSTU2_HL7ORG:
@@ -95,11 +99,12 @@ public class SubscriptionCanonicalizer {
 			retVal.setStatus(org.hl7.fhir.r4.model.Subscription.SubscriptionStatus.fromCode(subscription.getStatus()));
 			retVal.setChannelType(getChannelType(theSubscription));
 			retVal.setCriteriaString(subscription.getCriteria());
-			retVal.setEndpointUrl(subscription.getChannel().getEndpoint());
-			retVal.setHeaders(subscription.getChannel().getHeader());
+			Subscription.Channel channel = subscription.getChannel();
+			retVal.setEndpointUrl(channel.getEndpoint());
+			retVal.setHeaders(channel.getHeader());
 			retVal.setChannelExtensions(extractExtension(subscription));
 			retVal.setIdElement(subscription.getIdElement());
-			retVal.setPayloadString(subscription.getChannel().getPayload());
+			retVal.setPayloadString(channel.getPayload());
 			retVal.setTags(extractTags(subscription));
 			retVal.setCrossPartitionEnabled(SubscriptionUtil.isCrossPartition(theSubscription));
 			retVal.setSendDeleteMessages(extractDeleteExtensionDstu2(subscription));
@@ -146,11 +151,12 @@ public class SubscriptionCanonicalizer {
 			setPartitionIdOnReturnValue(theSubscription, retVal);
 			retVal.setChannelType(getChannelType(theSubscription));
 			retVal.setCriteriaString(subscription.getCriteria());
-			retVal.setEndpointUrl(subscription.getChannel().getEndpoint());
-			retVal.setHeaders(subscription.getChannel().getHeader());
+			org.hl7.fhir.dstu3.model.Subscription.SubscriptionChannelComponent channel = subscription.getChannel();
+			retVal.setEndpointUrl(channel.getEndpoint());
+			retVal.setHeaders(channel.getHeader());
 			retVal.setChannelExtensions(extractExtension(subscription));
 			retVal.setIdElement(subscription.getIdElement());
-			retVal.setPayloadString(subscription.getChannel().getPayload());
+			retVal.setPayloadString(channel.getPayload());
 			retVal.setPayloadSearchCriteria(getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_PAYLOAD_SEARCH_CRITERIA));
 			retVal.setTags(extractTags(subscription));
 			retVal.setCrossPartitionEnabled(SubscriptionUtil.isCrossPartition(theSubscription));
@@ -160,8 +166,8 @@ public class SubscriptionCanonicalizer {
 				String subjectTemplate;
 
 				try {
-					from = subscription.getChannel().getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_EMAIL_FROM);
-					subjectTemplate = subscription.getChannel().getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_SUBJECT_TEMPLATE);
+					from = channel.getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_EMAIL_FROM);
+					subjectTemplate = channel.getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_SUBJECT_TEMPLATE);
 				} catch (FHIRException theE) {
 					throw new ConfigurationException(Msg.code(558) + "Failed to extract subscription extension(s): " + theE.getMessage(), theE);
 				}
@@ -174,8 +180,8 @@ public class SubscriptionCanonicalizer {
 				String stripVersionIds;
 				String deliverLatestVersion;
 				try {
-					stripVersionIds = subscription.getChannel().getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_STRIP_VERSION_IDS);
-					deliverLatestVersion = subscription.getChannel().getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_DELIVER_LATEST_VERSION);
+					stripVersionIds = channel.getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_STRIP_VERSION_IDS);
+					deliverLatestVersion = channel.getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_DELIVER_LATEST_VERSION);
 				} catch (FHIRException theE) {
 					throw new ConfigurationException(Msg.code(559) + "Failed to extract subscription extension(s): " + theE.getMessage(), theE);
 				}
@@ -232,11 +238,20 @@ public class SubscriptionCanonicalizer {
 							}, toList())));
 				}
 				case R5: {
-					org.hl7.fhir.r5.model.Subscription subscription = (org.hl7.fhir.r5.model.Subscription) theSubscription;
-					return subscription
-						.getExtension()
-						.stream()
-						.collect(Collectors.groupingBy(t -> t.getUrl(), mapping(t -> t.getValueAsPrimitive().getValueAsString(), toList())));
+					// TODO KHS fix org.hl7.fhir.r4b.model.BaseResource.getStructureFhirVersionEnum() for R4B
+					if (theSubscription instanceof org.hl7.fhir.r4b.model.Subscription) {
+						org.hl7.fhir.r4b.model.Subscription subscription = (org.hl7.fhir.r4b.model.Subscription) theSubscription;
+						return subscription
+							.getExtension()
+							.stream()
+							.collect(Collectors.groupingBy(t -> t.getUrl(), mapping(t -> t.getValueAsPrimitive().getValueAsString(), toList())));
+					} else if (theSubscription instanceof org.hl7.fhir.r5.model.Subscription) {
+						org.hl7.fhir.r5.model.Subscription subscription = (org.hl7.fhir.r5.model.Subscription) theSubscription;
+						return subscription
+							.getExtension()
+							.stream()
+							.collect(Collectors.groupingBy(t -> t.getUrl(), mapping(t -> t.getValueAsPrimitive().getValueAsString(), toList())));
+					}
 				}
 				case DSTU2_HL7ORG:
 				case DSTU2_1:
@@ -255,24 +270,68 @@ public class SubscriptionCanonicalizer {
 		org.hl7.fhir.r4.model.Subscription subscription = (org.hl7.fhir.r4.model.Subscription) theSubscription;
 		CanonicalSubscription retVal = new CanonicalSubscription();
 		retVal.setStatus(subscription.getStatus());
-		retVal.setChannelType(getChannelType(theSubscription));
-		retVal.setCriteriaString(subscription.getCriteria());
-		retVal.setEndpointUrl(subscription.getChannel().getEndpoint());
-		retVal.setHeaders(subscription.getChannel().getHeader());
+		org.hl7.fhir.r4.model.Subscription.SubscriptionChannelComponent channel = subscription.getChannel();
+		retVal.setHeaders(channel.getHeader());
 		retVal.setChannelExtensions(extractExtension(subscription));
 		retVal.setIdElement(subscription.getIdElement());
-		retVal.setPayloadString(subscription.getChannel().getPayload());
+		retVal.setPayloadString(channel.getPayload());
 		retVal.setPayloadSearchCriteria(getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_PAYLOAD_SEARCH_CRITERIA));
 		retVal.setTags(extractTags(subscription));
 		setPartitionIdOnReturnValue(theSubscription, retVal);
 		retVal.setCrossPartitionEnabled(SubscriptionUtil.isCrossPartition(theSubscription));
 
+		List<org.hl7.fhir.r4.model.CanonicalType> profiles = subscription.getMeta().getProfile();
+		for (org.hl7.fhir.r4.model.CanonicalType next : profiles) {
+			if (SubscriptionConstants.SUBSCRIPTION_TOPIC_PROFILE_URL.equals(next.getValueAsString())) {
+				retVal.setTopicSubscription(true);
+			}
+		}
+
+		if (retVal.isTopicSubscription()) {
+			CanonicalTopicSubscription topicSubscription = retVal.getTopicSubscription();
+			topicSubscription.setTopic(getCriteria(theSubscription));
+
+			// WIP STR5 support other content types
+			topicSubscription.setContent(org.hl7.fhir.r5.model.Subscription.SubscriptionPayloadContent.FULLRESOURCE);
+			retVal.setEndpointUrl(channel.getEndpoint());
+			retVal.setChannelType(getChannelType(subscription));
+
+			for (org.hl7.fhir.r4.model.Extension next : subscription.getCriteriaElement().getExtension()) {
+				if (SubscriptionConstants.SUBSCRIPTION_TOPIC_FILTER_URL.equals(next.getUrl())) {
+					List<CanonicalTopicSubscriptionFilter> filters = CanonicalTopicSubscriptionFilter.fromQueryUrl(next.getValue().primitiveValue());
+					filters.forEach(topicSubscription::addFilter);
+				}
+			}
+
+			if (channel.hasExtension(SubscriptionConstants.SUBSCRIPTION_TOPIC_CHANNEL_HEARTBEAT_PERIOD_URL)) {
+				org.hl7.fhir.r4.model.Extension timeoutExtension = channel.getExtensionByUrl(SubscriptionConstants.SUBSCRIPTION_TOPIC_CHANNEL_HEARTBEAT_PERIOD_URL);
+				topicSubscription.setHeartbeatPeriod(Integer.valueOf(timeoutExtension.getValue().primitiveValue()));
+			}
+			if (channel.hasExtension(SubscriptionConstants.SUBSCRIPTION_TOPIC_CHANNEL_TIMEOUT_URL)) {
+				org.hl7.fhir.r4.model.Extension timeoutExtension = channel.getExtensionByUrl(SubscriptionConstants.SUBSCRIPTION_TOPIC_CHANNEL_TIMEOUT_URL);
+				topicSubscription.setTimeout(Integer.valueOf(timeoutExtension.getValue().primitiveValue()));
+			}
+			if (channel.hasExtension(SubscriptionConstants.SUBSCRIPTION_TOPIC_CHANNEL_MAX_COUNT)) {
+				org.hl7.fhir.r4.model.Extension timeoutExtension = channel.getExtensionByUrl(SubscriptionConstants.SUBSCRIPTION_TOPIC_CHANNEL_MAX_COUNT);
+				topicSubscription.setMaxCount(Integer.valueOf(timeoutExtension.getValue().primitiveValue()));
+			}
+			if (channel.getPayloadElement().hasExtension(SubscriptionConstants.SUBSCRIPTION_TOPIC_CHANNEL_PAYLOAD_CONTENT)) {
+				org.hl7.fhir.r4.model.Extension timeoutExtension = channel.getPayloadElement().getExtensionByUrl(SubscriptionConstants.SUBSCRIPTION_TOPIC_CHANNEL_PAYLOAD_CONTENT);
+				topicSubscription.setContent(org.hl7.fhir.r5.model.Subscription.SubscriptionPayloadContent.fromCode(timeoutExtension.getValue().primitiveValue()));
+			}
+
+		} else {
+			retVal.setCriteriaString(getCriteria(theSubscription));
+			retVal.setEndpointUrl(channel.getEndpoint());
+			retVal.setChannelType(getChannelType(subscription));
+		}
+
 		if (retVal.getChannelType() == CanonicalSubscriptionChannelType.EMAIL) {
 			String from;
 			String subjectTemplate;
 			try {
-				from = subscription.getChannel().getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_EMAIL_FROM);
-				subjectTemplate = subscription.getChannel().getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_SUBJECT_TEMPLATE);
+				from = channel.getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_EMAIL_FROM);
+				subjectTemplate = channel.getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_SUBJECT_TEMPLATE);
 			} catch (FHIRException theE) {
 				throw new ConfigurationException(Msg.code(561) + "Failed to extract subscription extension(s): " + theE.getMessage(), theE);
 			}
@@ -284,8 +343,8 @@ public class SubscriptionCanonicalizer {
 			String stripVersionIds;
 			String deliverLatestVersion;
 			try {
-				stripVersionIds = subscription.getChannel().getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_STRIP_VERSION_IDS);
-				deliverLatestVersion = subscription.getChannel().getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_DELIVER_LATEST_VERSION);
+				stripVersionIds = channel.getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_STRIP_VERSION_IDS);
+				deliverLatestVersion = channel.getExtensionString(HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_DELIVER_LATEST_VERSION);
 			} catch (FHIRException theE) {
 				throw new ConfigurationException(Msg.code(562) + "Failed to extract subscription extension(s): " + theE.getMessage(), theE);
 			}
@@ -301,31 +360,49 @@ public class SubscriptionCanonicalizer {
 			}
 		}
 
-		Extension extension = subscription.getChannel().getExtensionByUrl(EX_SEND_DELETE_MESSAGES);
+		Extension extension = channel.getExtensionByUrl(EX_SEND_DELETE_MESSAGES);
 		if (extension != null && extension.hasValue() && extension.getValue() instanceof BooleanType) {
 			retVal.setSendDeleteMessages(((BooleanType) extension.getValue()).booleanValue());
 		}
 		return retVal;
 	}
 
-	private CanonicalSubscription canonicalizeR5(IBaseResource theSubscription) {
-		org.hl7.fhir.r5.model.Subscription subscription = (org.hl7.fhir.r5.model.Subscription) theSubscription;
+	private CanonicalSubscription canonicalizeR4B(IBaseResource theSubscription) {
+		org.hl7.fhir.r4b.model.Subscription subscription = (org.hl7.fhir.r4b.model.Subscription) theSubscription;
 
 		CanonicalSubscription retVal = new CanonicalSubscription();
-		Enumerations.SubscriptionStatusCodes status = subscription.getStatus();
+		org.hl7.fhir.r4b.model.Enumerations.SubscriptionStatus status = subscription.getStatus();
 		if (status != null) {
 			retVal.setStatus(org.hl7.fhir.r4.model.Subscription.SubscriptionStatus.fromCode(status.toCode()));
 		}
 		setPartitionIdOnReturnValue(theSubscription, retVal);
-		retVal.setChannelType(getChannelType(subscription));
-		retVal.setCriteriaString(getCriteria(theSubscription));
-		retVal.setEndpointUrl(subscription.getEndpoint());
-		retVal.setHeaders(subscription.getHeader());
+		org.hl7.fhir.r4b.model.Subscription.SubscriptionChannelComponent channel = subscription.getChannel();
+		retVal.setHeaders(channel.getHeader());
 		retVal.setChannelExtensions(extractExtension(subscription));
 		retVal.setIdElement(subscription.getIdElement());
-		retVal.setPayloadString(subscription.getContentType());
+		retVal.setPayloadString(channel.getPayload());
 		retVal.setPayloadSearchCriteria(getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_PAYLOAD_SEARCH_CRITERIA));
 		retVal.setTags(extractTags(subscription));
+
+		List<org.hl7.fhir.r4b.model.CanonicalType> profiles = subscription.getMeta().getProfile();
+		for (org.hl7.fhir.r4b.model.CanonicalType next : profiles) {
+			if (SubscriptionConstants.SUBSCRIPTION_TOPIC_PROFILE_URL.equals(next.getValueAsString())) {
+				retVal.setTopicSubscription(true);
+			}
+		}
+
+		if (retVal.isTopicSubscription()) {
+			retVal.getTopicSubscription().setTopic(getCriteria(theSubscription));
+
+			// WIP STR5 support other content types
+			retVal.getTopicSubscription().setContent(org.hl7.fhir.r5.model.Subscription.SubscriptionPayloadContent.FULLRESOURCE);
+			retVal.setEndpointUrl(channel.getEndpoint());
+			retVal.setChannelType(getChannelType(subscription));
+		} else {
+			retVal.setCriteriaString(getCriteria(theSubscription));
+			retVal.setEndpointUrl(channel.getEndpoint());
+			retVal.setChannelType(getChannelType(subscription));
+		}
 
 		if (retVal.getChannelType() == CanonicalSubscriptionChannelType.EMAIL) {
 			String from;
@@ -344,8 +421,8 @@ public class SubscriptionCanonicalizer {
 			String stripVersionIds;
 			String deliverLatestVersion;
 			try {
-				stripVersionIds = getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_STRIP_VERSION_IDS);
-				deliverLatestVersion = getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_DELIVER_LATEST_VERSION);
+				stripVersionIds = getExtensionString(channel, HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_STRIP_VERSION_IDS);
+				deliverLatestVersion = getExtensionString(channel, HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_DELIVER_LATEST_VERSION);
 			} catch (FHIRException theE) {
 				throw new ConfigurationException(Msg.code(565) + "Failed to extract subscription extension(s): " + theE.getMessage(), theE);
 			}
@@ -353,7 +430,7 @@ public class SubscriptionCanonicalizer {
 			retVal.getRestHookDetails().setDeliverLatestVersion(Boolean.parseBoolean(deliverLatestVersion));
 		}
 
-		List<org.hl7.fhir.r5.model.Extension> topicExts = subscription.getExtensionsByUrl("http://hl7.org/fhir/subscription/topics");
+		List<org.hl7.fhir.r4b.model.Extension> topicExts = subscription.getExtensionsByUrl("http://hl7.org/fhir/subscription/topics");
 		if (topicExts.size() > 0) {
 			IBaseReference ref = (IBaseReference) topicExts.get(0).getValueAsPrimitive();
 			if (!"EventDefinition".equals(ref.getReferenceElement().getResourceType())) {
@@ -361,6 +438,111 @@ public class SubscriptionCanonicalizer {
 			}
 		}
 
+		org.hl7.fhir.r4b.model.Extension extension = channel.getExtensionByUrl(EX_SEND_DELETE_MESSAGES);
+		if (extension != null && extension.hasValue() && extension.hasValueBooleanType()) {
+			retVal.setSendDeleteMessages(extension.getValueBooleanType().booleanValue());
+		}
+
+		return retVal;
+	}
+
+	private CanonicalSubscription canonicalizeR5(IBaseResource theSubscription) {
+		org.hl7.fhir.r5.model.Subscription subscription = (org.hl7.fhir.r5.model.Subscription) theSubscription;
+
+		CanonicalSubscription retVal = new CanonicalSubscription();
+
+		setPartitionIdOnReturnValue(theSubscription, retVal);
+		retVal.setChannelExtensions(extractExtension(subscription));
+		retVal.setIdElement(subscription.getIdElement());
+		retVal.setPayloadString(subscription.getContentType());
+		retVal.setPayloadSearchCriteria(getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_PAYLOAD_SEARCH_CRITERIA));
+		retVal.setTags(extractTags(subscription));
+
+		List<org.hl7.fhir.r5.model.Extension> topicExts = subscription.getExtensionsByUrl("http://hl7.org/fhir/subscription/topics");
+		if (topicExts.size() > 0) {
+			IBaseReference ref = (IBaseReference) topicExts.get(0).getValueAsPrimitive();
+			if (!"EventDefinition".equals(ref.getReferenceElement().getResourceType())) {
+				throw new PreconditionFailedException(Msg.code(2325) + "Topic reference must be an EventDefinition");
+			}
+		}
+
+		// All R5 subscriptions are topic subscriptions
+		retVal.setTopicSubscription(true);
+
+		Enumerations.SubscriptionStatusCodes status = subscription.getStatus();
+		if (status != null) {
+			switch(status) {
+				case REQUESTED:
+					retVal.setStatus(org.hl7.fhir.r4.model.Subscription.SubscriptionStatus.REQUESTED);
+					break;
+				case ACTIVE:
+					retVal.setStatus(org.hl7.fhir.r4.model.Subscription.SubscriptionStatus.ACTIVE);
+					break;
+				case ERROR:
+					retVal.setStatus(org.hl7.fhir.r4.model.Subscription.SubscriptionStatus.ERROR);
+					break;
+				case OFF:
+					retVal.setStatus(org.hl7.fhir.r4.model.Subscription.SubscriptionStatus.OFF);
+					break;
+				case NULL:
+				case ENTEREDINERROR:
+				default:
+					ourLog.warn("Converting R5 Subscription status from {} to ERROR", status);
+					retVal.setStatus(org.hl7.fhir.r4.model.Subscription.SubscriptionStatus.ERROR);
+			}
+		}
+		retVal.getTopicSubscription().setContent(subscription.getContent());
+		retVal.setEndpointUrl(subscription.getEndpoint());
+		retVal.getTopicSubscription().setTopic(subscription.getTopic());
+		retVal.setChannelType(getChannelType(subscription));
+
+		subscription.getFilterBy().forEach(filter -> {
+			retVal.getTopicSubscription().addFilter(convertFilter(filter));
+		});
+
+		retVal.getTopicSubscription().setHeartbeatPeriod(subscription.getHeartbeatPeriod());
+		retVal.getTopicSubscription().setMaxCount(subscription.getMaxCount());
+
+		setR5FlagsBasedOnChannelType(subscription, retVal);
+
+		return retVal;
+	}
+
+	private void setR5FlagsBasedOnChannelType(org.hl7.fhir.r5.model.Subscription subscription, CanonicalSubscription retVal) {
+		if (retVal.getChannelType() == CanonicalSubscriptionChannelType.EMAIL) {
+			String from;
+			String subjectTemplate;
+			try {
+				from = getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_EMAIL_FROM);
+				subjectTemplate = getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_SUBJECT_TEMPLATE);
+			} catch (FHIRException theE) {
+				throw new ConfigurationException(Msg.code(2323) + "Failed to extract subscription extension(s): " + theE.getMessage(), theE);
+			}
+			retVal.getEmailDetails().setFrom(from);
+			retVal.getEmailDetails().setSubjectTemplate(subjectTemplate);
+		}
+
+		if (retVal.getChannelType() == CanonicalSubscriptionChannelType.RESTHOOK) {
+			String stripVersionIds;
+			String deliverLatestVersion;
+			try {
+				stripVersionIds = getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_STRIP_VERSION_IDS);
+				deliverLatestVersion = getExtensionString(subscription, HapiExtensions.EXT_SUBSCRIPTION_RESTHOOK_DELIVER_LATEST_VERSION);
+			} catch (FHIRException theE) {
+				throw new ConfigurationException(Msg.code(2324) + "Failed to extract subscription extension(s): " + theE.getMessage(), theE);
+			}
+			retVal.getRestHookDetails().setStripVersionId(Boolean.parseBoolean(stripVersionIds));
+			retVal.getRestHookDetails().setDeliverLatestVersion(Boolean.parseBoolean(deliverLatestVersion));
+		}
+	}
+
+	private CanonicalTopicSubscriptionFilter convertFilter(org.hl7.fhir.r5.model.Subscription.SubscriptionFilterByComponent theFilter) {
+		CanonicalTopicSubscriptionFilter retVal = new CanonicalTopicSubscriptionFilter();
+		retVal.setResourceType(theFilter.getResourceType());
+		retVal.setFilterParameter(theFilter.getFilterParameter());
+		retVal.setModifier(theFilter.getModifier());
+		retVal.setComparator(theFilter.getComparator());
+		retVal.setValue(theFilter.getValue());
 		return retVal;
 	}
 
@@ -409,6 +591,14 @@ public class SubscriptionCanonicalizer {
 				}
 				break;
 			}
+			case R4B: {
+				org.hl7.fhir.r4b.model.Subscription.SubscriptionChannelType type = ((org.hl7.fhir.r4b.model.Subscription) theSubscription).getChannel().getType();
+				if (type != null) {
+					String channelTypeCode = type.toCode();
+					retVal = CanonicalSubscriptionChannelType.fromCode(null, channelTypeCode);
+				}
+				break;
+			}
 			case R5: {
 				org.hl7.fhir.r5.model.Coding nextTypeCode = ((org.hl7.fhir.r5.model.Subscription) theSubscription).getChannelType();
 				CanonicalSubscriptionChannelType code = CanonicalSubscriptionChannelType.fromCode(nextTypeCode.getSystem(), nextTypeCode.getCode());
@@ -417,6 +607,8 @@ public class SubscriptionCanonicalizer {
 				}
 				break;
 			}
+			default:
+				throw new IllegalStateException(Msg.code(2326) + "Unsupported Subscription FHIR version: " + myFhirContext.getVersion().getVersion());
 		}
 
 		return retVal;
@@ -437,23 +629,20 @@ public class SubscriptionCanonicalizer {
 			case R4:
 				retVal = ((org.hl7.fhir.r4.model.Subscription) theSubscription).getCriteria();
 				break;
-			case R5:
-				org.hl7.fhir.r5.model.Subscription subscription = (org.hl7.fhir.r5.model.Subscription) theSubscription;
-				String topicElement = subscription.getTopicElement().getValue();
-				org.hl7.fhir.r5.model.SubscriptionTopic topic = (org.hl7.fhir.r5.model.SubscriptionTopic) subscription.getContained().stream().filter(t -> ("#" + t.getId()).equals(topicElement) || (t.getId()).equals(topicElement)).findFirst().orElse(null);
-				if (topic == null) {
-					ourLog.warn("Missing contained subscription topic in R5 subscription");
-					return null;
-				}
-				retVal = topic.getResourceTriggerFirstRep().getQueryCriteria().getCurrent();
+			case R4B:
+				retVal = ((org.hl7.fhir.r4b.model.Subscription) theSubscription).getCriteria();
 				break;
+			case R5:
+			default:
+				throw new IllegalStateException(Msg.code(2327) + "Subscription criteria is not supported for FHIR version: " + myFhirContext.getVersion().getVersion());
 		}
 
 		return retVal;
 	}
 
 
-	public void setMatchingStrategyTag(@Nonnull IBaseResource theSubscription, @Nullable SubscriptionMatchingStrategy theStrategy) {
+	public void setMatchingStrategyTag(@Nonnull IBaseResource theSubscription, @Nullable SubscriptionMatchingStrategy
+		theStrategy) {
 		IBaseMetaType meta = theSubscription.getMeta();
 
 		// Remove any existing strategy tag
@@ -478,6 +667,8 @@ public class SubscriptionCanonicalizer {
 			display = "Database";
 		} else if (theStrategy == SubscriptionMatchingStrategy.IN_MEMORY) {
 			display = "In-memory";
+		} else if (theStrategy == SubscriptionMatchingStrategy.TOPIC) {
+			display = "SubscriptionTopic";
 		} else {
 			throw new IllegalStateException(Msg.code(567) + "Unknown " + SubscriptionMatchingStrategy.class.getSimpleName() + ": " + theStrategy);
 		}

@@ -4,7 +4,7 @@ import ca.uhn.fhir.batch2.api.IJobPersistence;
 import ca.uhn.fhir.batch2.model.JobInstance;
 import ca.uhn.fhir.batch2.model.StatusEnum;
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.api.model.BulkExportJobResults;
@@ -32,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.annotation.Nonnull;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -39,6 +40,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
+import static org.exparity.hamcrest.date.DateMatchers.within;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -49,32 +52,24 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class BulkDataExportJobSchedulingHelperImplTest {
+	private final FhirContext myFhirContext = FhirContext.forR4Cached();
 	@Mock
-	private DaoConfig myDaoConfig;
-
+	private JpaStorageSettings myStorageSettings;
 	@Mock
 	private PlatformTransactionManager myTxManager;
-
 	@Mock
 	private TransactionTemplate myTxTemplate;
-
 	@Mock
 	private IJobPersistence myJpaJobPersistence;
-
 	@Mock
 	private BulkExportHelperService myBulkExportHelperSvc;
-
 	@Mock
 	private DaoRegistry myDaoRegistry;
-
 	@Mock
 	private IFhirResourceDao<IBaseBinary> myBinaryDao;
-
 	@Captor
 	private ArgumentCaptor<Date> myCutoffCaptor;
-
 	private BulkDataExportJobSchedulingHelperImpl myBulkDataExportJobSchedulingHelper;
-	private final FhirContext myFhirContext = FhirContext.forR4Cached();
 
 	@Test
 	public void testPurgeExpiredFilesDisabledDoesNothing() {
@@ -113,7 +108,7 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 
 		jobInstances.get(0).setReport(null);
 
-		setupTestEnabledNoBinaries(expectedRetentionHours, jobInstances);
+		setupTestEnabledNoBinaries(jobInstances);
 
 		myBulkDataExportJobSchedulingHelper.purgeExpiredFiles();
 
@@ -125,7 +120,7 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 		}
 
 		final Date cutoffDate = myCutoffCaptor.getValue();
-		assertEquals(DateUtils.truncate(computeDateFromConfig(expectedRetentionHours), Calendar.MINUTE), DateUtils.truncate(cutoffDate, Calendar.MINUTE));
+		assertThat(cutoffDate, within(1, ChronoUnit.MINUTES, computeDateFromConfig(expectedRetentionHours)));
 	}
 
 	@Test
@@ -136,7 +131,7 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 
 		jobInstances.get(0).setReport("{garbage}");
 
-		setupTestEnabledNoBinaries(expectedRetentionHours, jobInstances);
+		setupTestEnabledNoBinaries(jobInstances);
 
 		myBulkDataExportJobSchedulingHelper.purgeExpiredFiles();
 
@@ -148,7 +143,7 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 		}
 
 		final Date cutoffDate = myCutoffCaptor.getValue();
-		assertEquals(DateUtils.truncate(computeDateFromConfig(expectedRetentionHours), Calendar.MINUTE), DateUtils.truncate(cutoffDate, Calendar.MINUTE));
+		assertThat(cutoffDate, within(1, ChronoUnit.MINUTES, computeDateFromConfig(expectedRetentionHours)));
 	}
 
 	@Test
@@ -171,7 +166,7 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 		}
 
 		final Date cutoffDate = myCutoffCaptor.getValue();
-		assertEquals(DateUtils.truncate(computeDateFromConfig(expectedRetentionHours), Calendar.MINUTE), DateUtils.truncate(cutoffDate, Calendar.MINUTE));
+		assertThat(cutoffDate, within(1, ChronoUnit.MINUTES, computeDateFromConfig(expectedRetentionHours)));
 	}
 
 	@Test
@@ -194,7 +189,7 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 		}
 
 		final Date cutoffDate = myCutoffCaptor.getValue();
-		assertEquals(DateUtils.truncate(computeDateFromConfig(expectedRetentionHours), Calendar.MINUTE), DateUtils.truncate(cutoffDate, Calendar.MINUTE));
+		assertThat(cutoffDate, within(1, ChronoUnit.MINUTES, computeDateFromConfig(expectedRetentionHours)));
 	}
 
 	@Test
@@ -218,14 +213,14 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 
 		final Date cutoffDate = myCutoffCaptor.getValue();
 
-		assertEquals(DateUtils.truncate(computeDateFromConfig(expectedRetentionHours), Calendar.MINUTE), DateUtils.truncate(cutoffDate, Calendar.MINUTE));
+		assertThat(cutoffDate, within(1, ChronoUnit.MINUTES, computeDateFromConfig(expectedRetentionHours)));
 	}
 
 	@Test
 	public void purgeExpiredFilesMultipleJobsMultipleBinariesTwoHourRetention() {
 		final int expectedRetentionHours = 2;
 		final int numBinariesPerJob = 3;
-		final List<JobInstance> jobInstances = getJobInstances( numBinariesPerJob, StatusEnum.COMPLETED, StatusEnum.COMPLETED, StatusEnum.COMPLETED);
+		final List<JobInstance> jobInstances = getJobInstances(numBinariesPerJob, StatusEnum.COMPLETED, StatusEnum.COMPLETED, StatusEnum.COMPLETED);
 
 		setupTestEnabled(expectedRetentionHours, jobInstances);
 
@@ -242,14 +237,14 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 
 		final Date cutoffDate = myCutoffCaptor.getValue();
 
-		assertEquals(DateUtils.truncate(computeDateFromConfig(expectedRetentionHours), Calendar.MINUTE), DateUtils.truncate(cutoffDate, Calendar.MINUTE));
+		assertThat(cutoffDate, within(1, ChronoUnit.MINUTES, computeDateFromConfig(expectedRetentionHours)));
 	}
 
 	@Test
 	public void purgeExpiredFilesMultipleJobsMultipleBinariesTwoHourRetentionMixedStatuses() {
 		final int expectedRetentionHours = 2;
 		final int numBinariesPerJob = 3;
-		final List<JobInstance> jobInstances = getJobInstances( numBinariesPerJob, StatusEnum.COMPLETED, StatusEnum.FAILED, StatusEnum.COMPLETED);
+		final List<JobInstance> jobInstances = getJobInstances(numBinariesPerJob, StatusEnum.COMPLETED, StatusEnum.FAILED, StatusEnum.COMPLETED);
 
 		setupTestEnabled(expectedRetentionHours, jobInstances);
 
@@ -269,36 +264,7 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 
 		final Date cutoffDate = myCutoffCaptor.getValue();
 
-		assertEquals(DateUtils.truncate(computeDateFromConfig(expectedRetentionHours), Calendar.MINUTE), DateUtils.truncate(cutoffDate, Calendar.MINUTE));
-	}
-
-	@Nonnull
-	private static List<JobInstance> getJobInstances(int theNumBinaries, StatusEnum... theStatusEnums) {
-		return IntStream.range(0, theStatusEnums.length)
-			.mapToObj(index -> Pair.of(index, theStatusEnums[index]))
-			.map(pair -> {
-				final JobInstance jobInstance = new JobInstance();
-				final StatusEnum status = pair.getSecond();
-				final String instanceId = status.name() + pair.getFirst();
-				jobInstance.setInstanceId(instanceId);
-				jobInstance.setReport(serialize(getBulkExportJobResults(instanceId, theNumBinaries)));
-				jobInstance.setStatus(status);
-				return jobInstance;
-		}).toList();
-	}
-
-	private static String serialize(BulkExportJobResults theBulkExportJobResults) {
-		return JsonUtil.serialize(theBulkExportJobResults);
-	}
-
-	@Nonnull
-	private static BulkExportJobResults getBulkExportJobResults(String theInstanceId, int theNumBinaries) {
-		final BulkExportJobResults bulkExportJobResults = new BulkExportJobResults();
-		bulkExportJobResults.setResourceTypeToBinaryIds(Map.of("Patient",
-			IntStream.range(0, theNumBinaries)
-				.mapToObj(theInt -> theInstanceId + "-binary-" + theInt)
-				.toList()));
-		return bulkExportJobResults;
+		assertThat(cutoffDate, within(1, ChronoUnit.MINUTES, computeDateFromConfig(expectedRetentionHours)));
 	}
 
 	@Nonnull
@@ -317,14 +283,14 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 		setupTest(true, theRetentionHours, theJobInstances, true);
 	}
 
-	private void setupTestEnabledNoBinaries(int theRetentionHours, List<JobInstance> theJobInstances) {
-		setupTest(true, theRetentionHours, theJobInstances, false);
+	private void setupTestEnabledNoBinaries(List<JobInstance> theJobInstances) {
+		setupTest(true, 1, theJobInstances, false);
 	}
 
 	private void setupTest(boolean theIsEnabled, int theRetentionHours, List<JobInstance> theJobInstances, boolean theIsEnableBinaryMocks) {
-		myBulkDataExportJobSchedulingHelper = new BulkDataExportJobSchedulingHelperImpl(myDaoRegistry, myTxManager, myDaoConfig, myBulkExportHelperSvc, myJpaJobPersistence, myTxTemplate);
+		myBulkDataExportJobSchedulingHelper = new BulkDataExportJobSchedulingHelperImpl(myDaoRegistry, myTxManager, myStorageSettings, myBulkExportHelperSvc, myJpaJobPersistence, myTxTemplate);
 
-		when(myDaoConfig.isEnableTaskBulkExportJobExecution()).thenReturn(theIsEnabled);
+		when(myStorageSettings.isEnableTaskBulkExportJobExecution()).thenReturn(theIsEnabled);
 
 		if (!theIsEnabled) {
 			return;
@@ -333,11 +299,13 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 
 		final Answer<List<JobInstance>> fetchInstancesAnswer = theInvocationOnMock -> {
 			final TransactionCallback<List<JobInstance>> transactionCallback = theInvocationOnMock.getArgument(0);
+			//noinspection DataFlowIssue
 			return transactionCallback.doInTransaction(null);
 		};
 
 		final Answer<Void> purgeExpiredJobsAnswer = theInvocationOnMock -> {
 			final TransactionCallback<Optional<JobInstance>> transactionCallback = theInvocationOnMock.getArgument(0);
+			//noinspection DataFlowIssue
 			transactionCallback.doInTransaction(null);
 			return null;
 		};
@@ -346,12 +314,12 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 			eq(StatusEnum.getEndedStatuses()),
 			myCutoffCaptor.capture(),
 			any(PageRequest.class)))
-				.thenReturn(theJobInstances);
+			.thenReturn(theJobInstances);
 
 		when(myTxTemplate.execute(any()))
 			.thenAnswer(fetchInstancesAnswer).thenAnswer(purgeExpiredJobsAnswer);
 
-		when(myDaoConfig.getBulkExportFileRetentionPeriodHours())
+		when(myStorageSettings.getBulkExportFileRetentionPeriodHours())
 			.thenReturn(theRetentionHours);
 
 		if (theJobInstances.isEmpty()) {
@@ -378,5 +346,34 @@ public class BulkDataExportJobSchedulingHelperImplTest {
 		final IIdType retVal = myFhirContext.getVersion().newIdType();
 		retVal.setValue(theResourceId);
 		return retVal;
+	}
+
+	@Nonnull
+	private static List<JobInstance> getJobInstances(int theNumBinaries, StatusEnum... theStatusEnums) {
+		return IntStream.range(0, theStatusEnums.length)
+			.mapToObj(index -> Pair.of(index, theStatusEnums[index]))
+			.map(pair -> {
+				final JobInstance jobInstance = new JobInstance();
+				final StatusEnum status = pair.getSecond();
+				final String instanceId = status.name() + pair.getFirst();
+				jobInstance.setInstanceId(instanceId);
+				jobInstance.setReport(serialize(getBulkExportJobResults(instanceId, theNumBinaries)));
+				jobInstance.setStatus(status);
+				return jobInstance;
+			}).toList();
+	}
+
+	private static String serialize(BulkExportJobResults theBulkExportJobResults) {
+		return JsonUtil.serialize(theBulkExportJobResults);
+	}
+
+	@Nonnull
+	private static BulkExportJobResults getBulkExportJobResults(String theInstanceId, int theNumBinaries) {
+		final BulkExportJobResults bulkExportJobResults = new BulkExportJobResults();
+		bulkExportJobResults.setResourceTypeToBinaryIds(Map.of("Patient",
+			IntStream.range(0, theNumBinaries)
+				.mapToObj(theInt -> theInstanceId + "-binary-" + theInt)
+				.toList()));
+		return bulkExportJobResults;
 	}
 }
