@@ -122,7 +122,8 @@
 		<module>tests/hapi-fhir-base-test-mindeps-server</module>
 		<module>hapi-fhir-spring-boot</module>
 		<module>hapi-fhir-jacoco</module>
-    </modules>
+		<module>hapi-fhir-sparql</module>
+	</modules>
 
 	<dependencies>
 		<dependency>
