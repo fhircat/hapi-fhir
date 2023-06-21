@@ -17,9 +17,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class SparqlTest {
+class SparqlR4Test {
 	private static final FhirContext ourCtx = FhirContext.forR4Cached();
-	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(SparqlTest.class);
+	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(SparqlR4Test.class);
 	private static FHIRPathEngine ourEngine;
 
 	@Test
