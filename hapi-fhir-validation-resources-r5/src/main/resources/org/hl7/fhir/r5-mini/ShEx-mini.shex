@@ -1,0 +1,691 @@
+PREFIX fhir: <http://hl7.org/fhir/>
+PREFIX fhirvs: <http://hl7.org/fhir/ValueSet/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+<Resource> {
+    fhir:id @<id>?;                         # Logical id of this artifact
+    fhir:meta @<Meta>?;                     # Metadata about the resource
+    fhir:implicitRules @<uri>?;             # A set of rules under which this 
+                                            # content was created 
+    fhir:language @<code> AND
+    	{fhir:v @fhirvs:all-languages}?;  # Language of the resource content
+}
+
+<DomainResource> EXTENDS @<Resource> CLOSED {
+    a [fhir:DomainResource]?;
+    fhir:nodeRole [fhir:treeRoot]?;
+    fhir:text @<Narrative>?;                # Text summary of the resource, for 
+                                            # human interpretation 
+    fhir:contained @<OneOrMore_Resource>?;  # Contained, inline Resources
+    fhir:extension @<OneOrMore_Extension>?;  # Additional content defined by 
+                                            # implementations 
+    fhir:modifierExtension @<OneOrMore_Extension>?;  # Extensions that cannot be ignored
+}
+
+<Observation> EXTENDS @<DomainResource> CLOSED {
+    a [fhir:Observation]?;
+    fhir:nodeRole [fhir:treeRoot]?;
+    fhir:identifier @<OneOrMore_Identifier>?;  # Business Identifier for observation
+#     fhir:instantiates (@<canonical>  AND {fhir:link @<ObservationDefinition> ?})  OR 
+#     			(@<Reference>  AND {fhir:link @<ObservationDefinition> ?})  ?;  # Instantiates FHIR 
+#                                             # ObservationDefinition 
+#     fhir:basedOn @<OneOrMore_Reference_CarePlan_OR_DeviceRequest_OR_ImmunizationRecommendation_OR_MedicationRequest_OR_NutritionOrder_OR_ServiceRequest>?;  # Fulfills plan, proposal or order
+#     fhir:triggeredBy @<OneOrMore_Observation.triggeredBy>?;  # Triggering observation(s)
+#     fhir:partOf @<OneOrMore_Reference_GenomicStudy_OR_ImagingStudy_OR_Immunization_OR_MedicationAdministration_OR_MedicationDispense_OR_MedicationStatement_OR_Procedure>?;  # Part of referenced event
+    fhir:status @<code> AND
+    	{fhir:v @fhirvs:observation-status};  # registered | preliminary | final | 
+                                            # amended + 
+#     fhir:category @<OneOrMore_CodeableConcept>?;  # Classification of  type of 
+#                                             # observation 
+    fhir:code @<CodeableConcept>;           # Type of observation (code / type)
+    fhir:subject @<Reference> AND {fhir:link 
+#     			@<BiologicallyDerivedProduct> OR 
+#     			@<Device> OR 
+#     			@<Group> OR 
+#     			@<Location> OR 
+#     			@<Medication> OR 
+#     			@<NutritionProduct> OR 
+#     			@<Organization> OR 
+    			@<Patient> # OR 
+#     			@<Practitioner> OR 
+#     			@<Procedure> OR 
+#     			@<Substance>
+                        ?}?;  # Who and/or what the observation is 
+                                            # about 
+#     fhir:focus @<OneOrMore_Reference_Resource>?;  # What the observation is about, 
+#                                             # when it is not about the subject 
+#                                             # of record 
+#     fhir:encounter @<Reference> AND {fhir:link 
+#     			@<Encounter> ?}?;  # Healthcare event during which this 
+#                                             # observation is made 
+    fhir:effective @<dateTime>  OR 
+    			@<Period>  OR 
+    			@<Timing>  OR 
+    			@<instant>  ?;  # Clinically relevant 
+                                            # time/time-period for observation 
+#     fhir:issued @<instant>?;                # Date/Time this version was made 
+#                                             # available 
+#     fhir:performer @<OneOrMore_Reference_CareTeam_OR_Organization_OR_Patient_OR_Practitioner_OR_PractitionerRole_OR_RelatedPerson>?;  # Who is responsible for the 
+#                                             # observation 
+    fhir:value # @<Quantity>  OR 
+    			@<CodeableConcept>  OR 
+    			@<string>  OR 
+    			@<boolean> #  OR 
+#     			@<integer>  OR 
+#     			@<Range>  OR 
+#     			@<Ratio>  OR 
+#     			@<SampledData>  OR 
+#     			@<time>  OR 
+#     			@<dateTime>  OR 
+#     			@<Period>  OR 
+#     			@<Attachment>  OR 
+#     			(@<Reference>  AND {fhir:link @<MolecularSequence> ?})
+                        ?;  # Actual result
+#     fhir:dataAbsentReason @<CodeableConcept>?;  # Why the result is missing
+#     fhir:interpretation @<OneOrMore_CodeableConcept>?;  # High, low, normal, etc
+#     fhir:note @<OneOrMore_Annotation>?;     # Comments about the observation
+#     fhir:bodySite @<CodeableConcept>?;      # Observed body part
+#     fhir:bodyStructure @<Reference> AND {fhir:link 
+#     			@<BodyStructure> ?}?;  # Observed body structure
+#     fhir:method @<CodeableConcept>?;        # How it was done
+#     fhir:specimen @<Reference> AND {fhir:link 
+#     			@<Group> OR 
+#     			@<Specimen> ?}?;  # Specimen used for this observation
+#     fhir:device @<Reference> AND {fhir:link 
+#     			@<Device> OR 
+#     			@<DeviceMetric> ?}?;  # A reference to the device that 
+#                                             # generates the measurements or the 
+#                                             # device settings for the device 
+    fhir:referenceRange @<OneOrMore_Observation.referenceRange>?;  # Provides guide for interpretation
+#     fhir:hasMember @<OneOrMore_Reference_MolecularSequence_OR_Observation_OR_QuestionnaireResponse>?;  # Related resource that belongs to 
+#                                             # the Observation group 
+#     fhir:derivedFrom @<OneOrMore_Reference_DocumentReference_OR_GenomicStudy_OR_ImagingSelection_OR_ImagingStudy_OR_MolecularSequence_OR_Observation_OR_QuestionnaireResponse>?;  # Related resource from which the 
+#                                             # observation is made 
+    fhir:component @<OneOrMore_Observation.component>?;  # Component results
+}
+
+<Observation.referenceRange> EXTENDS @<BackboneElement> CLOSED {
+    fhir:low @<Quantity>?;                  # Low Range, if relevant
+    fhir:high @<Quantity>?;                 # High Range, if relevant
+    fhir:normalValue @<CodeableConcept>?;   # Normal value, if relevant
+    fhir:type @<CodeableConcept>?;          # Reference range qualifier
+#     fhir:appliesTo @<OneOrMore_CodeableConcept>?;  # Reference range population
+#     fhir:age @<Range>?;                     # Applicable age range, if relevant
+#     fhir:text @<markdown>?;                 # Text based reference range in an 
+#                                             # observation 
+}
+
+# Triggering observation(s)
+# <Observation.triggeredBy> EXTENDS @<BackboneElement> CLOSED {
+#     fhir:observation @<Reference> AND {fhir:link 
+#     			@<Observation> ?};  # Triggering observation
+#     fhir:type @<code> AND
+#     	{fhir:v @fhirvs:observation-triggeredbytype};  # reflex | repeat | re-run
+#     fhir:reason @<string>?;                 # Reason that the observation was 
+#                                             # triggered 
+# }
+
+<Observation.component> EXTENDS @<BackboneElement> CLOSED {
+    fhir:code @<CodeableConcept>;           # Type of component observation 
+                                            # (code / type) 
+    fhir:value @<Quantity>  OR 
+    			@<CodeableConcept>  OR 
+    			@<string>  OR 
+    			@<boolean> #  OR 
+#    			@<integer>  OR 
+#    			@<Range>  OR 
+#    			@<Ratio>  OR 
+#    			@<SampledData>  OR 
+#    			@<time>  OR 
+#    			@<dateTime>  OR 
+#    			@<Period>  OR 
+#    			@<Attachment>  OR 
+#    			(@<Reference>  AND {fhir:link @<MolecularSequence> ?})
+                        ?;  # Actual component result
+#    fhir:dataAbsentReason @<CodeableConcept>?;  # Why the component result is missing
+#    fhir:interpretation @<OneOrMore_CodeableConcept>?;  # High, low, normal, etc
+    fhir:referenceRange @<OneOrMore_Observation.referenceRange>?;  # Provides guide for interpretation 
+                                            # of component result 
+}
+
+<Patient> EXTENDS @<DomainResource> CLOSED {
+    a [fhir:Patient]?;
+    fhir:nodeRole [fhir:treeRoot]?;
+    fhir:identifier @<OneOrMore_Identifier>?;  # An identifier for this patient
+    fhir:active @<boolean>?;                # Whether this patient's record is 
+                                            # in active use 
+    fhir:name @<OneOrMore_HumanName>?;      # A name associated with the patient
+#    fhir:telecom @<OneOrMore_ContactPoint>?;  # A contact detail for the individual
+    fhir:gender @<code> AND
+    	{fhir:v @fhirvs:administrative-gender}?;  # male | female | other | unknown
+#     fhir:birthDate @<date>?;                # The date of birth for the 
+#                                             # individual 
+#     fhir:deceased @<boolean>  OR 
+#     			@<dateTime>  ?;  # Indicates if the individual is 
+#                                             # deceased or not 
+#     fhir:address @<OneOrMore_Address>?;     # An address for the individual
+#     fhir:maritalStatus @<CodeableConcept>?;  # Marital (civil) status of a patient
+#     fhir:multipleBirth @<boolean>  OR 
+#     			@<integer>  ?;  # Whether patient is part of a 
+#                                             # multiple birth 
+#     fhir:photo @<OneOrMore_Attachment>?;    # Image of the patient
+#     fhir:contact @<OneOrMore_Patient.contact>?;  # A contact party (e.g. guardian, 
+#                                             # partner, friend) for the patient 
+#     fhir:communication @<OneOrMore_Patient.communication>?;  # A language which may be used to 
+#                                             # communicate with the patient about 
+#                                             # his or her health 
+#     fhir:generalPractitioner @<OneOrMore_Reference_Organization_OR_Practitioner_OR_PractitionerRole>?;  # Patient's nominated primary care 
+#                                             # provider 
+#     fhir:managingOrganization @<Reference> AND {fhir:link 
+#     			@<Organization> ?}?;  # Organization that is the custodian 
+#                                             # of the patient record 
+#     fhir:link @<OneOrMore_Patient.link>?;   # Link to a Patient or RelatedPerson 
+#                                             # resource that concerns the same 
+#                                             # actual individual 
+}
+
+<Procedure> EXTENDS @<DomainResource> CLOSED {
+    a [fhir:Procedure]?;
+    fhir:nodeRole [fhir:treeRoot]?;
+    fhir:identifier @<OneOrMore_Identifier>?;  # External Identifiers for this 
+                                            # procedure 
+#     fhir:instantiatesCanonical @<OneOrMore_canonical>?;  # Instantiates FHIR protocol or 
+#                                             # definition 
+#     fhir:instantiatesUri @<OneOrMore_uri>?;  # Instantiates external protocol or 
+#                                             # definition 
+#     fhir:basedOn @<OneOrMore_Reference_CarePlan_OR_ServiceRequest>?;  # A request for this procedure
+#     fhir:partOf @<OneOrMore_Reference_MedicationAdministration_OR_Observation_OR_Procedure>?;  # Part of referenced event
+    fhir:status @<code> AND
+    	{fhir:v @fhirvs:event-status};  # preparation | in-progress | 
+                                            # not-done | on-hold | stopped | 
+                                            # completed | entered-in-error | 
+                                            # unknown 
+#     fhir:statusReason @<CodeableConcept>?;  # Reason for current status
+#     fhir:category @<OneOrMore_CodeableConcept>?;  # Classification of the procedure
+    fhir:code @<CodeableConcept>?;          # Identification of the procedure
+    fhir:subject @<Reference> AND {fhir:link 
+#     			@<Device> OR 
+#     			@<Group> OR 
+#     			@<Location> OR 
+#     			@<Organization> OR 
+    			@<Patient> # OR 
+#     			@<Practitioner>
+                        ?};  # Individual or entity the procedure 
+                                            # was performed on 
+#     fhir:focus @<Reference> AND {fhir:link 
+#     			@<CareTeam> OR 
+#     			@<Group> OR 
+#     			@<Organization> OR 
+#     			@<Patient> OR 
+#     			@<Practitioner> OR 
+#     			@<PractitionerRole> OR 
+#     			@<RelatedPerson> OR 
+#     			@<Specimen> ?}?;  # Who is the target of the procedure 
+#                                             # when it is not the subject of 
+#                                             # record only 
+#     fhir:encounter @<Reference> AND {fhir:link 
+#     			@<Encounter> ?}?;  # The Encounter during which this 
+#                                             # Procedure was created 
+#     fhir:occurrence @<dateTime>  OR 
+#     			@<Period>  OR 
+#     			@<string>  OR 
+#     			@<Age>  OR 
+#     			@<Range>  OR 
+#     			@<Timing>  ?;  # When the procedure occurred or is 
+#                                             # occurring 
+    fhir:recorded @<dateTime>?;             # When the procedure was first 
+                                            # captured in the subject's record 
+#     fhir:recorder @<Reference> AND {fhir:link 
+#     			@<Patient> OR 
+#     			@<Practitioner> OR 
+#     			@<PractitionerRole> OR 
+#     			@<RelatedPerson> ?}?;  # Who recorded the procedure
+#     fhir:reported @<boolean>  OR 
+#     			(@<Reference>  AND {fhir:link @<Patient> OR 
+#     			 @<RelatedPerson> OR 
+#     			 @<Practitioner> OR 
+#     			 @<PractitionerRole> OR 
+#     			 @<Organization> ?})  ?;  # Reported rather than primary record
+#     fhir:performer @<OneOrMore_Procedure.performer>?;  # Who performed the procedure and 
+#                                             # what they did 
+#     fhir:location @<Reference> AND {fhir:link 
+#     			@<Location> ?}?;  # Where the procedure happened
+#     fhir:reason @<OneOrMore_CodeableReference>?;  # The justification that the 
+#                                             # procedure was performed 
+#     fhir:bodySite @<OneOrMore_CodeableConcept>?;  # Target body sites
+#     fhir:outcome @<CodeableConcept>?;       # The result of procedure
+#     fhir:report @<OneOrMore_Reference_Composition_OR_DiagnosticReport_OR_DocumentReference>?;  # Any report resulting from the 
+#                                             # procedure 
+#     fhir:complication @<OneOrMore_CodeableReference>?;  # Complication following the 
+#                                             # procedure 
+#     fhir:followUp @<OneOrMore_CodeableConcept>?;  # Instructions for follow up
+#     fhir:note @<OneOrMore_Annotation>?;     # Additional information about the 
+#                                             # procedure 
+#     fhir:focalDevice @<OneOrMore_Procedure.focalDevice>?;  # Manipulated, implanted, or removed 
+#                                             # device 
+#     fhir:used @<OneOrMore_CodeableReference>?;  # Items used during procedure
+#     fhir:supportingInfo @<OneOrMore_Reference_Resource>?;  # Extra information relevant to the 
+#                                             # procedure 
+}
+
+<Questionnaire> EXTENDS @<DomainResource> CLOSED {
+    a [fhir:Questionnaire]?;
+    fhir:nodeRole [fhir:treeRoot]?;
+    fhir:url @<uri>?;                       # Canonical identifier for this 
+                                            # questionnaire, represented as an 
+                                            # absolute URI (globally unique) 
+    fhir:identifier @<OneOrMore_Identifier>?;  # Business identifier for 
+                                            # questionnaire 
+    fhir:version @<string>?;                # Business version of the 
+                                            # questionnaire 
+#    fhir:versionAlgorithm @<string>  OR 
+#    			@<Coding>  ?;  # How to compare versions
+    fhir:name @<string>?;                   # Name for this questionnaire 
+                                            # (computer friendly) 
+#    fhir:title @<string>?;                  # Name for this questionnaire (human 
+#                                            # friendly) 
+#    fhir:derivedFrom @<OneOrMore_canonical>?;  # Based on Questionnaire
+    fhir:status @<code> AND
+    	{fhir:v @fhirvs:publication-status};  # draft | active | retired | unknown
+#    fhir:experimental @<boolean>?;          # For testing purposes, not real 
+#                                            # usage 
+    fhir:subjectType @<OneOrMore_code> AND
+    	{fhir:v @fhirvs:resource-types}?;  # Resource that can be subject of 
+                                            # QuestionnaireResponse 
+    fhir:date @<dateTime>?;                 # Date last changed
+#    fhir:publisher @<string>?;              # Name of the publisher/steward 
+#                                            # (organization or individual) 
+#    fhir:contact @<OneOrMore_ContactDetail>?;  # Contact details for the publisher
+#    fhir:description @<markdown>?;          # Natural language description of 
+#                                            # the questionnaire 
+#    fhir:useContext @<OneOrMore_UsageContext>?;  # The context that the content is 
+#                                            # intended to support 
+#    fhir:jurisdiction @<OneOrMore_CodeableConcept>?;  # Intended jurisdiction for 
+#                                            # questionnaire (if applicable) 
+#    fhir:purpose @<markdown>?;              # Why this questionnaire is defined
+#    fhir:copyright @<markdown>?;            # Use and/or publishing restrictions
+#    fhir:copyrightLabel @<string>?;         # Copyright holder and year(s)
+#    fhir:approvalDate @<date>?;             # When the questionnaire was 
+#                                            # approved by publisher 
+#    fhir:lastReviewDate @<date>?;           # When the questionnaire was last 
+#                                            # reviewed by the publisher 
+#    fhir:effectivePeriod @<Period>?;        # When the questionnaire is expected 
+#                                            # to be used 
+    fhir:code @<OneOrMore_Coding>?;         # Concept that represents the 
+                                            # overall questionnaire 
+    fhir:item @<OneOrMore_Questionnaire.item>?;  # Questions and sections within the 
+                                            # Questionnaire 
+}
+
+<Questionnaire.item> EXTENDS @<BackboneElement> CLOSED {
+    fhir:linkId @<string>;                  # Unique id for item in questionnaire
+#    fhir:definition @<uri>?;                # ElementDefinition - details for 
+#                                            # the item 
+    fhir:code @<OneOrMore_Coding>?;         # Corresponding concept for this 
+                                            # item in a terminology 
+#    fhir:prefix @<string>?;                 # E.g. "1(a)", "2.5.3"
+    fhir:text @<string>?;                   # Primary text for the item
+    fhir:type @<code> AND
+    	{fhir:v @fhirvs:item-type};  # group | display | boolean | 
+                                            # decimal | integer | date | 
+                                            # dateTime + 
+#    fhir:enableWhen @<OneOrMore_Questionnaire.item.enableWhen>?;  # Only allow data when
+#    fhir:enableBehavior @<code> AND
+#    	{fhir:v @fhirvs:questionnaire-enable-behavior}?;  # all | any
+#    fhir:disabledDisplay @<code> AND
+#    	{fhir:v @fhirvs:questionnaire-disabled-display}?;  # hidden | protected
+    fhir:required @<boolean>?;              # Whether the item must be included 
+                                            # in data results 
+#    fhir:repeats @<boolean>?;               # Whether the item may repeat
+#    fhir:readOnly @<boolean>?;              # Don't allow human editing
+#    fhir:maxLength @<integer>?;             # No more than these many characters
+#    fhir:answerConstraint @<code> AND
+#    	{fhir:v @fhirvs:questionnaire-answer-constraint}?;  # optionsOnly | optionsOrType | 
+#                                            # optionsOrString 
+    fhir:answerValueSet @<canonical>?;      # ValueSet containing permitted 
+                                            # answers 
+#    fhir:answerOption @<OneOrMore_Questionnaire.item.answerOption>?;  # Permitted answer
+#    fhir:initial @<OneOrMore_Questionnaire.item.initial>?;  # Initial value(s) when item is 
+#                                            # first rendered 
+    fhir:item @<OneOrMore_Questionnaire.item>?;  # Nested questionnaire items
+}
+
+### Composite Datatypes ###
+
+<Base> CLOSED {   
+    a [fhir:Base]?;
+    fhir:nodeRole [fhir:treeRoot]?;
+}  
+
+<Element> EXTENDS @<Base> CLOSED {
+    fhir:nodeRole [fhir:treeRoot]?;
+    fhir:id @<string>?;                     # Unique id for inter-element 
+                                            # referencing 
+    fhir:extension @<OneOrMore_Extension>?;  # Additional content defined by 
+                                            # implementations 
+}
+
+<BackboneElement> EXTENDS @<Element> CLOSED {
+    fhir:modifierExtension @<OneOrMore_Extension>?;  # Extensions that cannot be ignored 
+                                            # even if unrecognized 
+}
+
+<PrimitiveType> EXTENDS @<DataType> CLOSED {
+}
+
+<BackboneType> EXTENDS @<DataType> CLOSED {
+    a [fhir:BackboneType]?;
+    fhir:modifierExtension @<OneOrMore_Extension>?;  # Extensions that cannot be ignored 
+                                            # even if unrecognized 
+}
+
+<DataType> EXTENDS @<Element> CLOSED {
+}
+
+
+<CodeableConcept> EXTENDS @<DataType> CLOSED {
+    a [fhir:CodeableConcept]?;
+    a NONLITERAL*;
+    fhir:coding @<OneOrMore_Coding>?;       # Code defined by a terminology 
+                                            # system 
+    fhir:text @<string>?;                   # Plain text representation of the 
+                                            # concept 
+}
+
+<Coding> EXTENDS @<DataType> CLOSED {
+    a [fhir:Coding]?;
+    a NONLITERAL?;
+    fhir:system @<uri>?;                    # Identity of the terminology system
+    fhir:version @<string>?;                # Version of the system - if relevant
+    fhir:code @<code>?;                     # Symbol in syntax defined by the 
+                                            # system 
+    fhir:display @<string>?;                # Representation defined by the 
+                                            # system 
+    fhir:userSelected @<boolean>?;          # If this coding was chosen directly 
+                                            # by the user 
+}
+
+<Extension> EXTENDS @<DataType> CLOSED {
+    a [fhir:Extension]?;
+    fhir:url @<uri>; 
+    fhir:value # @<base64Binary>  OR 
+#    			@<boolean>  OR 
+#    			@<canonical>  OR 
+    			@<code> #  OR 
+#    			@<date>  OR 
+#    			@<dateTime>  OR 
+#    			@<decimal>  OR 
+#    			@<id>  OR 
+#    			@<instant>  OR 
+#    			@<integer>  OR 
+#    			@<integer64>  OR 
+#    			@<markdown>  OR 
+#    			@<oid>  OR 
+#    			@<positiveInt>  OR 
+#    			@<string>  OR 
+#    			@<time>  OR 
+#    			@<unsignedInt>  OR 
+#    			@<uri>  OR 
+#    			@<url>  OR 
+#    			@<uuid>  OR 
+#    			@<Address>  OR 
+#    			@<Age>  OR 
+#    			@<Annotation>  OR 
+#    			@<Attachment>  OR 
+#    			@<CodeableConcept>  OR 
+#    			@<CodeableReference>  OR 
+#    			@<Coding>  OR 
+#    			@<ContactPoint>  OR 
+#    			@<Count>  OR 
+#    			@<Distance>  OR 
+#    			@<Duration>  OR 
+#    			@<HumanName>  OR 
+#    			@<Identifier>  OR 
+#    			@<Money>  OR 
+#    			@<Period>  OR 
+#    			@<Quantity>  OR 
+#    			@<Range>  OR 
+#    			@<Ratio>  OR 
+#    			@<RatioRange>  OR 
+#    			@<Reference>  OR 
+#    			@<SampledData>  OR 
+#    			@<Signature>  OR 
+#    			@<Timing>  OR 
+#    			@<ContactDetail>  OR 
+#    			@<DataRequirement>  OR 
+#    			@<Expression>  OR 
+#    			@<ParameterDefinition>  OR 
+#    			@<RelatedArtifact>  OR 
+#    			@<TriggerDefinition>  OR 
+#    			@<UsageContext>  OR 
+#    			@<Availability>  OR 
+#    			@<ExtendedContactDetail>  OR 
+#    			@<Dosage>  OR 
+#    			@<Meta>
+                        ?; 
+}
+
+<HumanName> EXTENDS @<DataType> CLOSED {
+    a [fhir:HumanName]?;
+    fhir:use @<code> AND
+    	{fhir:v @fhirvs:name-use}?;  # usual | official | temp | nickname 
+                                            # | anonymous | old | maiden 
+    fhir:text @<string>?;                   # Text representation of the full 
+                                            # name 
+    fhir:family @<string>?;                 # Family name (often called 
+                                            # 'Surname') 
+    fhir:given @<OneOrMore_string>?;        # Given names (not always 'first'). 
+                                            # Includes middle names 
+    fhir:prefix @<OneOrMore_string>?;       # Parts that come before the name
+    fhir:suffix @<OneOrMore_string>?;       # Parts that come after the name
+    fhir:period @<Period>?;                 # Time period when name was/is in use
+}
+
+<Identifier> EXTENDS @<DataType> CLOSED {
+    a [fhir:Identifier]?;
+    fhir:use @<code> AND
+    	{fhir:v @fhirvs:identifier-use}?;  # usual | official | temp | 
+                                            # secondary | old (If known) 
+    fhir:type @<CodeableConcept>?;          # Description of identifier
+    fhir:system @<uri>?;                    # The namespace for the identifier 
+                                            # value 
+    fhir:value @<string>?;                  # The value that is unique
+    fhir:period @<Period>?;                 # Time period when id is/was valid 
+                                            # for use 
+#     fhir:assigner @<Reference> AND {fhir:link 
+#     			@<Organization> ?}?;  # Organization that issued id (may 
+#                                             # be just text) 
+}
+
+<Meta> EXTENDS @<DataType> CLOSED {
+    a [fhir:Meta]?;
+    fhir:versionId @<id>?;                  # Version specific identifier
+    fhir:lastUpdated @<instant>?;           # When the resource version last 
+                                            # changed 
+    fhir:source @<uri>?;                    # Identifies where the resource 
+                                            # comes from 
+    fhir:profile @<OneOrMore_canonical>?;   # Profiles this resource claims to 
+                                            # conform to 
+    fhir:security @<OneOrMore_Coding>?;     # Security Labels applied to this 
+                                            # resource 
+    fhir:tag @<OneOrMore_Coding>?;          # Tags applied to this resource
+}
+
+<Narrative> EXTENDS @<DataType> CLOSED {
+    a [fhir:Narrative]?;
+    fhir:status @<code> AND
+    	{fhir:v @fhirvs:narrative-status};  # generated | extensions | 
+                                            # additional | empty 
+    fhir:div @<xhtml>?; # !!! missing                      # Limited xhtml content
+}
+
+<Period> EXTENDS @<DataType> CLOSED {
+    a [fhir:Period]?;
+    fhir:start @<dateTime>?;                # Starting time with inclusive 
+                                            # boundary 
+    fhir:end @<dateTime>?;                  # End time with inclusive boundary, 
+                                            # if not ongoing 
+}
+
+<Quantity> EXTENDS @<DataType> CLOSED {
+    a [fhir:Quantity]?;
+    fhir:value @<decimal>?;                 # Numerical value (with implicit 
+                                            # precision) 
+    fhir:comparator @<code> AND
+    	{fhir:v @fhirvs:quantity-comparator}?;  # < | <= | >= | > | ad - how to 
+                                            # understand the value 
+    fhir:unit @<string>?;                   # Unit representation
+    fhir:system @<uri>?;                    # System that defines coded unit form
+    fhir:code @<code>?;                     # Coded form of the unit
+}
+
+<Reference> EXTENDS @<DataType> CLOSED {
+    a [fhir:Reference]?;
+    fhir:link IRI?;
+    fhir:reference @<string>?;              # Literal reference, Relative, 
+                                            # internal or absolute URL 
+    fhir:type @<uri>?;                      # Type the reference refers to (e.g. 
+                                            # "Patient") - must be a resource in 
+                                            # resources 
+    fhir:identifier @<Identifier>?;         # Logical reference, when literal 
+                                            # reference is not known 
+    fhir:display @<string>?;                # Text alternative for the resource
+}
+
+<Timing> EXTENDS @<BackboneType> CLOSED {
+    a [fhir:Timing]?;
+    fhir:nodeRole [fhir:treeRoot]?;
+    fhir:event @<OneOrMore_dateTime>?;      # When the event occurs
+    fhir:repeat @<Element>?;                # When the event is to occur
+    fhir:code @<CodeableConcept>?;          # C | BID | TID | QID | AM | PM | QD 
+                                            # | QOD | + 
+}
+
+### Primitive Datatypes ###
+
+<boolean> EXTENDS @<PrimitiveType> CLOSED {
+    a [fhir:boolean]?;
+    fhir:v xsd:boolean OR ["true" "false"]?; # !!!                    # Primitive value for boolean
+}
+
+<canonical> EXTENDS @<PrimitiveType> CLOSED {
+    a [fhir:canonical]?;
+    fhir:v xsd:anyURI ?;
+}
+
+<code> EXTENDS @<PrimitiveType> CLOSED {
+    a [fhir:code]?;
+    fhir:v xsd:token OR xsd:string ?; # !!!
+}
+
+<dateTime> EXTENDS @<PrimitiveType> CLOSED {
+    a [fhir:dateTime]?;
+    fhir:v xsd:gYear OR xsd:gYearMonth OR xsd:date OR xsd:dateTime?;  # Primitive value for dateTime
+}
+
+<decimal> EXTENDS @<PrimitiveType> CLOSED {
+    a [fhir:decimal]?;
+    fhir:v xsd:decimal OR xsd:double?;      # Primitive value for decimal
+}
+
+<id> EXTENDS @<PrimitiveType> CLOSED {
+    a [fhir:id]?;
+    fhir:v xsd:string ?;
+}
+
+<instant> EXTENDS @<PrimitiveType> CLOSED {
+    a [fhir:instant]?;
+    fhir:v xsd:dateTime OR xsd:string?; # !!!                  # Primitive value for instant
+}
+
+<string> EXTENDS @<PrimitiveType> CLOSED {
+    a [fhir:string]?;
+    fhir:v xsd:string MAXLENGTH 1048576?;   # Primitive value for string
+}
+
+<uri> EXTENDS @<PrimitiveType> CLOSED {
+    a [fhir:uri]?;
+    fhir:v xsd:anyURI OR xsd:string?; # !!!                    # Primitive value for uri
+}
+
+<xhtml> CLOSED {
+    a [fhir:xhtml]?;
+    fhir:v rdf:XMLLiteral OR xsd:string?; # !!!                    # Primitive value for uri
+}
+
+### Lists ###
+
+<OneOrMore_Coding> CLOSED {
+    rdf:first @<Coding>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_Coding> 
+}
+
+<OneOrMore_Extension> CLOSED {
+    rdf:first @<Extension>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_Extension> 
+}
+
+<OneOrMore_HumanName> CLOSED {
+    rdf:first @<HumanName>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_HumanName> 
+}
+
+<OneOrMore_Identifier> CLOSED {
+    rdf:first @<Identifier>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_Identifier> 
+}
+
+<OneOrMore_Observation.component> CLOSED {
+    rdf:first @<Observation.component>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_Observation.component> 
+}
+
+<OneOrMore_Observation.referenceRange> CLOSED {
+    rdf:first @<Observation.referenceRange>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_Observation.referenceRange> 
+}
+
+<OneOrMore_Questionnaire.item> CLOSED {
+    rdf:first @<Questionnaire.item>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_Questionnaire.item> 
+}
+
+<OneOrMore_Resource> CLOSED {
+    rdf:first @<Resource>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_Resource> 
+}
+
+<OneOrMore_canonical> CLOSED {
+    rdf:first @<canonical>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_canonical> 
+}
+
+<OneOrMore_code> CLOSED {
+    rdf:first @<code>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_code> 
+}
+
+<OneOrMore_dateTime> CLOSED {
+    rdf:first @<dateTime>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_dateTime> 
+}
+
+<OneOrMore_string> CLOSED {
+    rdf:first @<string>  ;
+    rdf:rest [rdf:nil] OR @<OneOrMore_string> 
+}
+
+### Value sets ###
+
+fhirvs:administrative-gender ["male" "female" "other" "unknown"]
+fhirvs:all-languages xsd:string #EXTERNAL
+fhirvs:event-status ["preparation" "in-progress" "not-done" "on-hold" "stopped" "completed" "entered-in-error" "unknown"]
+fhirvs:identifier-use ["usual" "official" "temp" "secondary" "old"]
+fhirvs:item-type ["group" "display" "question" "boolean" "decimal" "integer" "date" "dateTime" "time" "string" "text" "url" "coding" "attachment" "reference" "quantity"]
+fhirvs:name-use ["usual" "official" "temp" "nickname" "anonymous" "old" "maiden"]
+fhirvs:narrative-status ["generated" "extensions" "additional" "empty"]
+fhirvs:observation-status ["registered" "preliminary" "final" "amended" "corrected" "cancelled" "entered-in-error" "unknown"]
+fhirvs:publication-status ["draft" "active" "retired" "unknown"]
+fhirvs:quantity-comparator ["<" "<=" ">=" ">" "ad"]
+fhirvs:resource-types ["Observation" "Patient" "Procedure" "Questionnaire"]
