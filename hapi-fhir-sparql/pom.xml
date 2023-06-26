@@ -1,138 +1,138 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-			xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-			xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>ca.uhn.hapi.fhir</groupId>
-		<artifactId>hapi-fhir</artifactId>
-		<version>6.7.6-SNAPSHOT</version>
-	</parent>
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>ca.uhn.hapi.fhir</groupId>
+    <artifactId>hapi-fhir</artifactId>
+    <version>6.7.6-SNAPSHOT</version>
+  </parent>
 
-	<artifactId>hapi-fhir-sparql</artifactId>
+  <artifactId>hapi-fhir-sparql</artifactId>
 
-	<properties>
-		<maven.compiler.source>17</maven.compiler.source>
-		<maven.compiler.target>17</maven.compiler.target>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-	</properties>
+  <properties>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
 
-	<dependencies>
-	  <dependency>
-		  <groupId>ca.uhn.hapi.fhir</groupId>
-		  <artifactId>hapi-fhir-base</artifactId>
-		  <version>${project.version}</version>
-	  </dependency>
-		<dependency>
-			<groupId>org.fhir</groupId>
-			<artifactId>ucum</artifactId>
-      <!--			<exclusions>-->
-      <!--				<exclusion>-->
-      <!--					<groupId>xpp3</groupId>-->
-      <!--					<artifactId>xpp3</artifactId>-->
-      <!--				</exclusion>-->
-      <!--				<exclusion>-->
-      <!--					<groupId>junit</groupId>-->
-      <!--					<artifactId>junit</artifactId>-->
-      <!--				</exclusion>-->
-      <!--			</exclusions>-->
-		</dependency>
+  <dependencies>
+    <dependency>
+      <groupId>ca.uhn.hapi.fhir</groupId>
+      <artifactId>hapi-fhir-base</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.fhir</groupId>
+      <artifactId>ucum</artifactId>
+      <!--      <exclusions>-->
+      <!--        <exclusion>-->
+      <!--          <groupId>xpp3</groupId>-->
+      <!--          <artifactId>xpp3</artifactId>-->
+      <!--        </exclusion>-->
+      <!--        <exclusion>-->
+      <!--          <groupId>junit</groupId>-->
+      <!--          <artifactId>junit</artifactId>-->
+      <!--        </exclusion>-->
+      <!--      </exclusions>-->
+    </dependency>
 
     <!-- Caching -->
-  	<dependency>
-  		<groupId>ca.uhn.hapi.fhir</groupId>
-  		<artifactId>hapi-fhir-caching-api</artifactId>
-  		<version>${project.version}</version>
-  	</dependency>
-  	<dependency>
-  		<groupId>ca.uhn.hapi.fhir</groupId>
-  		<artifactId>hapi-fhir-caching-caffeine</artifactId>
-  		<version>${project.version}</version>
-  	</dependency>
+    <dependency>
+      <groupId>ca.uhn.hapi.fhir</groupId>
+      <artifactId>hapi-fhir-caching-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>ca.uhn.hapi.fhir</groupId>
+      <artifactId>hapi-fhir-caching-caffeine</artifactId>
+      <version>${project.version}</version>
+    </dependency>
 
     <!-- R4 -->
-	  <dependency>
-		  <groupId>ca.uhn.hapi.fhir</groupId>
-		  <artifactId>hapi-fhir-structures-r4</artifactId>
-		  <version>6.7.6-SNAPSHOT</version>
-	  </dependency>
-	  <dependency>
-			<groupId>ca.uhn.hapi.fhir</groupId>
-			<artifactId>hapi-fhir-validation-resources-r4</artifactId>
-			<version>${project.version}</version>
-			<optional>true</optional>
-		</dependency>
+    <dependency>
+      <groupId>ca.uhn.hapi.fhir</groupId>
+      <artifactId>hapi-fhir-structures-r4</artifactId>
+      <version>6.7.6-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>ca.uhn.hapi.fhir</groupId>
+      <artifactId>hapi-fhir-validation-resources-r4</artifactId>
+      <version>${project.version}</version>
+      <optional>true</optional>
+    </dependency>
 
     <!-- R5 -->
-	  <dependency>
-		  <groupId>ca.uhn.hapi.fhir</groupId>
-		  <artifactId>hapi-fhir-structures-r5</artifactId>
-		  <version>6.7.6-SNAPSHOT</version>
-	  </dependency>
-	  <dependency>
-			<groupId>ca.uhn.hapi.fhir</groupId>
-			<artifactId>hapi-fhir-validation-resources-r5</artifactId>
-			<version>${project.version}</version>
-			<optional>true</optional>
-		</dependency>
-		<dependency>
-			<groupId>ca.uhn.hapi.fhir</groupId>
-			<artifactId>hapi-fhir-validation</artifactId>
-			<version>${project.version}</version>
-		</dependency>
+    <dependency>
+      <groupId>ca.uhn.hapi.fhir</groupId>
+      <artifactId>hapi-fhir-structures-r5</artifactId>
+      <version>6.7.6-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>ca.uhn.hapi.fhir</groupId>
+      <artifactId>hapi-fhir-validation-resources-r5</artifactId>
+      <version>${project.version}</version>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>ca.uhn.hapi.fhir</groupId>
+      <artifactId>hapi-fhir-validation</artifactId>
+      <version>${project.version}</version>
+    </dependency>
 
-    <!--	<dependency>-->
-    <!--		<groupId>ca.uhn.hapi.fhir</groupId>-->
-    <!--		<artifactId>hapi-fhir-converter</artifactId>-->
-    <!--		<version>${project.version}</version>-->
-    <!--	</dependency>-->
+    <!--  <dependency>-->
+    <!--    <groupId>ca.uhn.hapi.fhir</groupId>-->
+    <!--    <artifactId>hapi-fhir-converter</artifactId>-->
+    <!--    <version>${project.version}</version>-->
+    <!--  </dependency>-->
 
-    <!--	<dependency>-->
-    <!--		<groupId>ca.uhn.hapi.fhir</groupId>-->
-    <!--		<artifactId>org.hl7.fhir.validation</artifactId>-->
-    <!--		<version>${fhir_core_version}</version>-->
-    <!--		<exclusions>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>info.cqframework</groupId>-->
-    <!--				<artifactId>elm</artifactId>-->
-    <!--			</exclusion>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>info.cqframework</groupId>-->
-    <!--				<artifactId>cql-to-elm</artifactId>-->
-    <!--			</exclusion>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>info.cqframework</groupId>-->
-    <!--				<artifactId>quick</artifactId>-->
-    <!--			</exclusion>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>info.cqframework</groupId>-->
-    <!--				<artifactId>qdm</artifactId>-->
-    <!--			</exclusion>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>info.cqframework</groupId>-->
-    <!--				<artifactId>cql</artifactId>-->
-    <!--			</exclusion>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>info.cqframework</groupId>-->
-    <!--				<artifactId>model</artifactId>-->
-    <!--			</exclusion>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>io.javalin</groupId>-->
-    <!--				<artifactId>javalin</artifactId>-->
-    <!--			</exclusion>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>junit</groupId>-->
-    <!--				<artifactId>junit</artifactId>-->
-    <!--			</exclusion>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>org.apache.commons</groupId>-->
-    <!--				<artifactId>commons-collections4</artifactId>-->
-    <!--			</exclusion>-->
-    <!--			<exclusion>-->
-    <!--				<groupId>xpp3</groupId>-->
-    <!--				<artifactId>xpp3</artifactId>-->
-    <!--			</exclusion>-->
-    <!--		</exclusions>-->
-    <!--	</dependency>-->
+    <!--  <dependency>-->
+    <!--    <groupId>ca.uhn.hapi.fhir</groupId>-->
+    <!--    <artifactId>org.hl7.fhir.validation</artifactId>-->
+    <!--    <version>${fhir_core_version}</version>-->
+    <!--    <exclusions>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>info.cqframework</groupId>-->
+    <!--        <artifactId>elm</artifactId>-->
+    <!--      </exclusion>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>info.cqframework</groupId>-->
+    <!--        <artifactId>cql-to-elm</artifactId>-->
+    <!--      </exclusion>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>info.cqframework</groupId>-->
+    <!--        <artifactId>quick</artifactId>-->
+    <!--      </exclusion>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>info.cqframework</groupId>-->
+    <!--        <artifactId>qdm</artifactId>-->
+    <!--      </exclusion>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>info.cqframework</groupId>-->
+    <!--        <artifactId>cql</artifactId>-->
+    <!--      </exclusion>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>info.cqframework</groupId>-->
+    <!--        <artifactId>model</artifactId>-->
+    <!--      </exclusion>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>io.javalin</groupId>-->
+    <!--        <artifactId>javalin</artifactId>-->
+    <!--      </exclusion>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>junit</groupId>-->
+    <!--        <artifactId>junit</artifactId>-->
+    <!--      </exclusion>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>org.apache.commons</groupId>-->
+    <!--        <artifactId>commons-collections4</artifactId>-->
+    <!--      </exclusion>-->
+    <!--      <exclusion>-->
+    <!--        <groupId>xpp3</groupId>-->
+    <!--        <artifactId>xpp3</artifactId>-->
+    <!--      </exclusion>-->
+    <!--    </exclusions>-->
+    <!--  </dependency>-->
   </dependencies>
 </project>

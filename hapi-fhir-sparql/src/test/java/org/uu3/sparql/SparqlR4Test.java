@@ -66,7 +66,6 @@ class SparqlR4Test {
 
 	@BeforeAll
 	public static void beforeClass() {
-		Exception ex = new UcumException();
 		ourEngine = new FHIRPathEngine(new HapiWorkerContext(ourCtx, ourCtx.getValidationSupport()));
 	}
 }
